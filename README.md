@@ -1,7 +1,7 @@
 # 🎬 Video2ArabicSubs v0.1
 
 <p align="center">
-  <img src="img/first-logo-design.png" width="120" alt="Logo"/>
+  <img src="img/first-logo-design.png" width="550" alt="Logo"/>
 </p>
 
 <p align="center">
