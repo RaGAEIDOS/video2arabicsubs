@@ -1,0 +1,8 @@
+openai-whisper
+deep-translator
+moviepy
+imageio-ffmpeg
+pysrt
+pystray>=0.19.0
+Pillow>=9.2.0
+pyinstaller>=5.0

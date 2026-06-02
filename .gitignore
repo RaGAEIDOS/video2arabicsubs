@@ -1,0 +1,25 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+
+# Build output
+dist/
+build/
+*.exe
+*.msi
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary audio files
+*.wav
+
+# Generated subtitle files
+*.srt
