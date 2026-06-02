@@ -37,6 +37,7 @@
 
 <p align="center">
   <img src="screenshots/screenshots-1.png" width="700" alt="Screenshot"/>
+  <img src="screenshots/Screenshot%202026-06-02%20023007.png" width="700" alt="Screenshot"/>
 </p>
 
 ---
