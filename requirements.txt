@@ -1,8 +1,19 @@
+# ── Core pipeline ──
 openai-whisper
 deep-translator
 moviepy
 imageio-ffmpeg
 pysrt
+
+# ── Desktop (Tkinter) app ──
 pystray>=0.19.0
 Pillow>=9.2.0
 pyinstaller>=5.0
+
+# ── Web application (FastAPI) ──
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+
+# Optional — enables video URL ingestion (POST /api/url):
+# yt-dlp

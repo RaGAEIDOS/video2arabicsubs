@@ -23,3 +23,9 @@ build/
 
 # Generated subtitle files
 *.srt
+
+# Web app runtime data (uploads, temp audio, job outputs)
+web/data/
+
+# Test artifacts
+tests/_out/

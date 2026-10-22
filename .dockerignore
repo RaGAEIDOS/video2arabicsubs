@@ -1,0 +1,12 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+web/data
+dist
+build
+screenshots
+*.spec
+installer.nsi
+build.bat

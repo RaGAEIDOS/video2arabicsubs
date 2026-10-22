@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Video2ArabicSubs — ترجمة عربية</title>
+  <link rel="icon" href="/img/first-logo-design.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Cairo', 'Noto Sans Arabic', 'system-ui', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body class="min-h-screen bg-slate-950 text-slate-200 antialiased">
+  <!-- ══ Header ══ -->
+  <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur sticky top-0 z-30">
+    <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+      <img src="/img/first-logo-design.png" alt="Logo" class="h-10 w-10 rounded-xl shadow-lg shadow-indigo-500/20" />
+      <div class="ms-2 grow min-w-0">
+        <h1 class="truncate text-lg font-extrabold leading-tight text-white">Video2ArabicSubs</h1>
+        <p class="truncate text-xs text-slate-400" data-i18n="tagline">حوّل أي فيديو إلى ترجمة عربية بسهولة</p>
+      </div>
+      <a href="https://github.com/RaGAEIDOS/video2arabicsubs" target="_blank" rel="noopener"
+        class="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition">
+        <span>GitHub</span>
+      </a>
+      <button id="langToggle" type="button"
+        class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300 hover:bg-slate-800 transition">
+        EN
+      </button>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-4 py-6 pb-24">
+    <!-- ══ Setup grid ══ -->
+    <section id="setupGrid" class="grid gap-5 lg:grid-cols-2">
+      <!-- Left column: upload + options -->
+      <div class="space-y-5">
+        <!-- Upload card -->
+        <div class="card">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <h2 class="card-title">
+              <span class="step-badge">1</span>
+              <span data-i18n="upload.title">رفع الفيديو</span>
+            </h2>
+            <div id="sourceTabs" class="flex rounded-lg border border-slate-700 p-1 text-xs font-bold">
+              <button id="tabFile" class="tab-btn tab-active" data-i18n="upload.tabFile">ملف</button>
+              <button id="tabUrl" class="tab-btn" data-i18n="upload.tabUrl">رابط</button>
+            </div>
+          </div>
+
+          <!-- Drag & drop -->
+          <div id="dropZone" class="drop-zone" tabindex="0" role="button"
+            aria-label="Drag and drop or browse">
+            <input id="fileInput" type="file" class="hidden" accept="video/*,audio/*,.mkv,.avi,.mov,.wmv,.flv,.mpg,.mpeg,.m4v,.3gp,.ts,.mts,.vob,.ogv,.mxf,.mpv,.asf" />
+            <div class="text-4xl mb-2">🎬</div>
+            <p class="font-bold text-slate-200" data-i18n="upload.drop">اسحب وأفلت الفيديو هنا</p>
+            <p class="mt-1 text-xs text-slate-400" data-i18n="upload.dropSub">أو انقر للاختيار — MP4 · MKV · AVI · MOV · WebM · …</p>
+            <p class="mt-3 text-[11px] text-slate-500">
+              <span data-i18n="upload.max">الحد الأقصى</span>:
+              <span id="maxSizeLabel">—</span>
+            </p>
+            <div id="fileChip" class="file-chip hidden">
+              <span class="file-chip-name" id="fileChipName"></span>
+              <span class="file-chip-size" id="fileChipSize"></span>
+              <button type="button" id="fileChipClear" class="file-chip-x" title="Remove">✕</button>
+            </div>
+          </div>
+
+          <!-- URL input -->
+          <div id="urlBox" class="hidden mt-3">
+            <input id="urlInput" type="url" dir="ltr"
+              class="input w-full font-mono text-sm"
+              placeholder="https://example.com/video.mp4" />
+            <p class="mt-1.5 text-[11px] text-slate-500" data-i18n="upload.urlHint">
+              يتطلب تثبيت yt-dlp على الخادم.
+            </p>
+          </div>
+        </div>
+
+        <!-- Options card -->
+        <div class="card">
+          <h2 class="card-title mb-4">
+            <span class="step-badge">2</span>
+            <span data-i18n="opt.title">خيارات المعالجة</span>
+          </h2>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="field">
+              <span class="field-label" data-i18n="opt.model">نموذج Whisper</span>
+              <select id="optModel" class="input"></select>
+              <span class="field-hint" id="optModelHint"></span>
+            </label>
+
+            <label class="field">
+              <span class="field-label" data-i18n="opt.lang">لغة الفيديو</span>
+              <select id="optLang" class="input"></select>
+              <span class="field-hint" data-i18n="opt.langHint">«تلقائي» يكتشف Whisper لغة الكلام.</span>
+            </label>
+
+            <label class="field">
+              <span class="field-label" data-i18n="opt.engine">محرك الترجمة</span>
+              <select id="optEngine" class="input">
+                <option value="google" data-i18n="opt.engineGoogle">Google (عبر الإنترنت)</option>
+                <option value="none" data-i18n="opt.engineNone">بدون — الفيديو عربي أصلاً</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field-label" data-i18n="opt.format">صيغة الملف</span>
+              <select id="optFormat" class="input">
+                <option value="both" data-i18n="opt.fmtBoth">SRT + VTT</option>
+                <option value="srt">SRT</option>
+                <option value="vtt">WebVTT</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="mt-4 space-y-2.5">
+            <label class="check-row" id="burnRow">
+              <input type="checkbox" id="optBurn" class="check" />
+              <span data-i18n="opt.burn">حرق الترجمة داخل نسخة من الفيديو</span>
+              <span class="badge badge-amber" data-i18n="opt.burnBadge">FFmpeg</span>
+            </label>
+            <p id="burnHint" class="hidden ps-6 text-[11px] text-amber-400/90"></p>
+
+            <label class="check-row">
+              <input type="checkbox" id="optBom" class="check" />
+              <span data-i18n="opt.bom">كتابة الملفات بترميز UTF-8 مع BOM (توافق Windows)</span>
+            </label>
+          </div>
+
+          <div class="mt-5 flex flex-wrap items-center gap-3">
+            <button id="startBtn" class="btn btn-primary" disabled>
+              <span data-i18n="btn.start">▶ ابدأ الترجمة</span>
+            </button>
+            <span id="startHint" class="text-xs text-slate-500" data-i18n="btn.startHint">
+              اختر ملفاً أولاً
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column: job progress -->
+      <div class="space-y-5">
+        <div id="jobCard" class="card hidden">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <h2 class="card-title">
+              <span class="step-badge step-badge-live">3</span>
+              <span data-i18n="job.title">حالة المعالجة</span>
+            </h2>
+            <div class="flex gap-2">
+              <button id="cancelBtn" class="btn btn-danger hidden" data-i18n="btn.cancel">⏹ إيقاف</button>
+              <button id="newJobBtn" class="btn btn-ghost hidden" data-i18n="btn.new">✦ مهمة جديدة</button>
+            </div>
+          </div>
+
+          <p id="jobFile" class="mb-3 truncate text-xs text-slate-400"></p>
+
+          <!-- Stepper -->
+          <ol id="stepper" class="stepper mb-5"></ol>
+
+          <!-- Progress -->
+          <div class="mb-1 flex items-baseline justify-between text-xs font-bold">
+            <span id="stageLabel" class="text-slate-300"></span>
+            <span id="percentLabel" class="font-mono text-indigo-300">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="progressFill" class="progress-fill" style="width:0%"></div>
+            <div id="progressShimmer" class="progress-shimmer hidden"></div>
+          </div>
+
+          <!-- Log -->
+          <div class="mt-5">
+            <div class="mb-1.5 flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-400" data-i18n="log.title">سجل التشغيل</span>
+              <button id="logClear" class="text-[11px] text-slate-500 hover:text-slate-300" data-i18n="log.clear">مسح</button>
+            </div>
+            <div id="logBox" class="log-box" dir="ltr"></div>
+          </div>
+
+          <!-- Error banner -->
+          <div id="errorBox" class="mt-4 hidden rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300"></div>
+          <button id="retryBtn" class="btn btn-primary mt-3 hidden" data-i18n="btn.retry">↻ إعادة المحاولة</button>
+        </div>
+
+        <div id="idleCard" class="card">
+          <div class="flex flex-col items-center py-8 text-center">
+            <div class="text-5xl mb-3">🕌</div>
+            <p class="font-bold text-slate-300" data-i18n="idle.title">جاهز للترجمة</p>
+            <p class="mt-1 max-w-xs text-xs text-slate-500" data-i18n="idle.sub">
+              ارفع فيديو، اختر الخيارات، ثم اضغط «ابدأ الترجمة». سيظهر التقدم هنا مباشرة.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ Result: player + editor ══ -->
+    <section id="resultSection" class="mt-6 hidden">
+      <div class="card mb-5">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 class="card-title">
+            <span class="step-badge step-badge-done">4</span>
+            <span data-i18n="result.title">معاينة وتحرير الترجمة</span>
+          </h2>
+          <div id="downloadBar" class="flex flex-wrap items-center gap-2"></div>
+        </div>
+
+        <div class="grid gap-5 lg:grid-cols-5">
+          <!-- Player -->
+          <div class="lg:col-span-2">
+            <video id="preview" controls playsinline class="video-box"
+              crossorigin="anonymous"></video>
+            <p class="mt-2 text-[11px] text-slate-500" data-i18n="player.hint">
+              الترجمة العربية تظهر مباشرة داخل المشغل — استخدم زر CC أسفله عند الحاجة.
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <label class="check-row">
+                <input type="checkbox" id="dlBom" class="check" />
+                <span data-i18n="dl.bom">تحميل مع BOM</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Editor -->
+          <div class="lg:col-span-3 min-w-0">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-3">
+                <span class="text-xs font-bold text-slate-400">
+                  <span data-i18n="editor.count">عدد الأسطر</span>:
+                  <span id="cueCount" class="text-indigo-300">0</span>
+                </span>
+                <span id="saveState" class="text-[11px] text-slate-500"></span>
+              </div>
+              <div class="flex gap-2">
+                <button id="addCueBtn" class="btn btn-ghost" data-i18n="editor.add">＋ سطر</button>
+                <button id="saveCuesBtn" class="btn btn-primary" data-i18n="editor.save">💾 حفظ التعديلات</button>
+              </div>
+            </div>
+            <div class="editor-head hidden sm:grid">
+              <span data-i18n="editor.col.index">#</span>
+              <span data-i18n="editor.col.start">البداية</span>
+              <span data-i18n="editor.col.end">النهاية</span>
+              <span></span>
+              <span data-i18n="editor.col.text">النص العربي</span>
+              <span></span>
+            </div>
+            <div id="cueList" class="cue-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ GitHub push ══ -->
+      <div class="card">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 class="card-title">
+            <span class="step-badge step-badge-done">5</span>
+            <span data-i18n="gh.title">رفع النتائج إلى GitHub</span>
+          </h2>
+        </div>
+        <p class="mb-4 max-w-3xl text-xs leading-relaxed text-slate-500" data-i18n="gh.sub">
+          ارفع ملفات الترجمة (والفيديو المُحروق) إلى أي مستودع GitHub لديك صلاحية الكتابة فيه —
+          يتم الرفع من خادمك المحلي في التزام واحد.
+        </p>
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label class="field">
+            <span class="field-label" data-i18n="gh.repo">المستودع</span>
+            <input id="ghRepo" dir="ltr" class="input font-mono text-sm" placeholder="owner/repo"
+              data-i18n-ph="gh.repoPh" />
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="gh.branch">الفرع</span>
+            <input id="ghBranch" dir="ltr" class="input font-mono text-sm" value="main"
+              placeholder="main" data-i18n-ph="gh.branchPh" />
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="gh.folder">المجلد داخل المستودع</span>
+            <input id="ghFolder" dir="ltr" class="input font-mono text-sm" placeholder="subtitles"
+              data-i18n-ph="gh.folderPh" />
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="gh.token">رمز الوصول الشخصي (PAT)</span>
+            <input id="ghToken" type="password" dir="ltr" autocomplete="off"
+              class="input font-mono text-sm" placeholder="ghp_…" data-i18n-ph="gh.tokenPh" />
+          </label>
+          <label class="field sm:col-span-2 lg:col-span-4">
+            <span class="field-label" data-i18n="gh.message">رسالة الالتزام (اختياري)</span>
+            <input id="ghMsg" class="input text-sm" placeholder="إضافة ترجمة عربية للفيديو"
+              data-i18n-ph="gh.messagePh" />
+          </label>
+        </div>
+        <div class="mt-4 flex flex-wrap items-end justify-between gap-4">
+          <div class="field min-w-0 flex-1">
+            <span class="field-label" data-i18n="gh.files">الملفات المُرفوعة</span>
+            <div id="ghFiles" class="flex flex-wrap items-center gap-x-4 gap-y-2"></div>
+          </div>
+          <button id="ghPushBtn" class="btn btn-primary" data-i18n="gh.push">⬆ رفع إلى GitHub</button>
+        </div>
+        <p id="ghHint" class="field-hint mt-3">
+          يحتاج رمز PAT بصلاحية «Contents: Read and write» — الرمز يُرسل إلى خادمك المحلي فقط.
+        </p>
+        <div id="ghStatus" class="mt-3 hidden rounded-xl border p-3 text-sm"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ══ Toasts ══ -->
+  <div id="toasts" class="toasts"></div>
+
+  <script src="/static/app.js" defer></script>
+</body>
+
+</html>
