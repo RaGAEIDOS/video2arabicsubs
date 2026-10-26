@@ -92,7 +92,7 @@ class ProgressEvent:
 
 # ── Job options ───────────────────────────────────────────────────────────
 MODEL_SIZES = ("tiny", "base", "small", "medium", "large", "turbo")
-ENGINES = ("google", "none")
+ENGINES = ("google", "argos", "none")
 OUTPUT_FORMATS = ("srt", "vtt", "both")
 
 #: Curated subset of Whisper languages (ISO-639-1) for the UI dropdown.
@@ -129,7 +129,7 @@ class JobOptions:
 
     model_size: str = "small"
     source_language: str = "auto"      # "auto" or ISO-639-1 code
-    engine: str = "google"             # "google" | "none"
+    engine: str = "google"             # "google" (falls back offline) | "argos" | "none"
     output_format: str = "both"        # "srt" | "vtt" | "both"
     burn_video: bool = False           # burn subtitles into a copy of the video
     add_bom: bool = False              # write files as UTF-8 with BOM

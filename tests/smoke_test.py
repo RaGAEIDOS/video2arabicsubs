@@ -27,9 +27,11 @@ import app.transcriber  # noqa: E402,F401
 import core.pipeline  # noqa: E402,F401
 import core.translate  # noqa: E402,F401
 import web.main  # noqa: E402,F401
-import web.github_push  # noqa: E402,F401
 from core.models import JobOptions, PipelineCancelled  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+
+# Captured before any test stubs it away — used to exercise the real routing.
+REAL_TRANSLATE_BATCH = core.translate.translate_batch
 
 FAKE_SEGMENTS = [
     {"start": 0.0, "end": 2.4, "text": " Hello everyone and welcome back."},
@@ -120,6 +122,12 @@ def main() -> None:
                 raise Exception(
                     "429 Too Many Requests: too many requests to the server"
                 )
+            if self.mode == "always429":
+                raise Exception(
+                    "429 Too Many Requests: too many requests to the server"
+                )
+            if self.mode == "conn_once" and len(self.calls) == 1:
+                raise Exception("Connection reset by peer")
             if self.mode == "fatal":
                 raise ValueError("invalid source language: xx")
             lines = text.split("\n")
@@ -133,6 +141,7 @@ def main() -> None:
         """Run the real translate_batch against a fake Google + fast clocks."""
         sleeps.clear()
         with mock.patch("core.translate._get_translator", return_value=gt), \
+             mock.patch("core.translate.offline_available", return_value=False), \
              mock.patch("core.translate._throttle", side_effect=lambda *a, **k: None), \
              mock.patch("core.translate._sleep",
                         side_effect=lambda s, *a, **k: sleeps.append(s)):
@@ -153,9 +162,34 @@ def main() -> None:
     gt_429 = FakeGT("rate429")
     out3 = translate_with(gt_429, ["hello"])
     check(len(gt_429.calls) == 2, "rate-limit (429) retried after backoff")
-    check(len(sleeps) == 1 and 2.0 <= sleeps[0] < 3.0,
-          "backoff ≈ 2s (exponential, first step)")
+    check(len(sleeps) == 1 and 5.0 <= sleeps[0] < 6.0,
+          "429 backoff ≈ 5s (long rate-limit schedule, first step)")
     check(out3 == ["[ar]hello"], "retry returns the translation")
+
+    gt_block = FakeGT("always429")
+    notes: list = []
+    try:
+        translate_with(gt_block, ["hello"], on_note=notes.append)
+        blocked_msg = ""
+    except RuntimeError as exc:
+        blocked_msg = str(exc)
+    check(len(gt_block.calls) == 6, "persistent 429 → 6 attempts on the long schedule")
+    check(len(sleeps) == 5 and all(
+        core.translate.RATE_LIMIT_DELAYS[i] <= s < core.translate.RATE_LIMIT_DELAYS[i] + 0.6
+        for i, s in enumerate(sleeps)),
+        "429 waits follow the 5/15/30/60/120s schedule (~4min budget)")
+    check("press ↻ Retry" in blocked_msg and "saved" in blocked_msg,
+          "give-up message points at the resume button")
+    check(len(notes) == 5 and "Rate-limited by Google" in notes[0]
+          and "retry 1/5" in notes[0],
+          "wait notes exposed to the UI/log")
+
+    gt_conn = FakeGT("conn_once")
+    out_conn = translate_with(gt_conn, ["hello"], on_note=lambda _m: None)
+    check(len(gt_conn.calls) == 2, "connection blip retried once")
+    check(len(sleeps) == 1 and 2.0 <= sleeps[0] < 3.0,
+          "non-rate transient errors use the short 2s schedule")
+    check(out_conn == ["[ar]hello"], "blip retry returns the translation")
 
     gt_fatal = FakeGT("fatal")
     try:
@@ -216,11 +250,14 @@ def main() -> None:
         health = client.get("/api/health").json()
         check(health["ok"] is True, "GET /api/health → ok")
         check("small" in health["models"], "health lists whisper models")
-        check(isinstance(health.get("github", {}).get("env_token"), bool),
-              "health reports GITHUB_TOKEN presence")
+        check("argos" in health["engines"], "offline engine advertised")
         index = client.get("/")
         check(index.status_code == 200 and b"dropZone" in index.content,
               "GET / serves the SPA")
+        check(b"optOutDir" in index.content and b"optLang" not in index.content,
+              "UI: save-folder field present, source-language dropdown gone")
+        check(b'value="argos"' in index.content, "UI: offline (argos) option present")
+        check(b"ghRepo" not in index.content, "UI: GitHub push card removed")
         check(client.get("/static/app.js").status_code == 200, "static assets served")
 
         print("== Upload validation ==")
@@ -237,6 +274,19 @@ def main() -> None:
         )
         check(bad2.status_code == 422, "rejects bad model size (422)")
 
+        out_dir = ROOT / "tests" / "_outdir_tmp"
+        shutil.rmtree(out_dir, ignore_errors=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        blocker = out_dir / "blocker.txt"
+        blocker.write_text("x", encoding="utf-8")
+        bad3 = client.post(
+            "/api/upload",
+            files={"file": ("clip.mp4", io.BytesIO(b"x"), "video/mp4")},
+            data={"model_size": "small", "output_dir": str(blocker / "subs")},
+        )
+        check(bad3.status_code == 400 and "save folder" in bad3.json()["detail"].lower(),
+              "output_dir under a file → 400 fails fast")
+
         print("== Full happy-path job ==")
         payload = b"\x00\x01\x02" * 4096
         up = client.post(
@@ -249,6 +299,7 @@ def main() -> None:
                 "output_format": "both",
                 "burn_video": "false",
                 "add_bom": "false",
+                "output_dir": str(out_dir),
             },
         )
         check(up.status_code == 200 and "job_id" in up.json(), "POST /api/upload → job_id")
@@ -262,6 +313,15 @@ def main() -> None:
         log_text = "\n".join(status["logs"])
         check("Transcribing" in log_text and "Translating" in log_text,
               "stage log lines recorded")
+        check("Saved to" in log_text, "save-folder log line recorded")
+        copied_names = sorted(p.name for p in out_dir.iterdir())
+        check(any(n.endswith(".srt") for n in copied_names),
+              "SRT copied into the save folder")
+        check(any(n.endswith(".vtt") for n in copied_names),
+              "VTT copied into the save folder")
+        saved_srt = next(out_dir.glob("*.srt")).read_text(encoding="utf-8")
+        check("مرحباً بكم جميعاً وعوداً موفقة" in saved_srt,
+              "copied SRT holds the Arabic text")
 
         print("== Subtitles API ==")
         subs = client.get(f"/api/subtitles/{job_id}").json()
@@ -299,6 +359,8 @@ def main() -> None:
         srt2 = client.get(f"/api/download/{job_id}", params={"format": "srt"})
         check("سطر معدل" in srt2.content.decode("utf-8"), "edited text in new SRT")
         check("00:00:09,000" in srt2.content.decode("utf-8"), "edited timing in new SRT")
+        saved_srt2 = next(out_dir.glob("*.srt")).read_text(encoding="utf-8")
+        check("سطر معدل" in saved_srt2, "save folder re-synced after the edit")
         bad_put = client.put(f"/api/subtitles/{job_id}",
                              json={"cues": [{"start": 5.0, "end": 1.0, "text": "x"}]})
         check(bad_put.status_code == 422, "end < start rejected (422)")
@@ -318,94 +380,6 @@ def main() -> None:
 
         print("== Cancel endpoint (already done → no-op) ==")
         check(client.post(f"/api/cancel/{job_id}").status_code == 200, "cancel → 200")
-
-        print("== GitHub push ==")
-        with mock.patch("web.github_push.push_files") as push_mock:
-            push_mock.return_value = {
-                "commit_sha": "a" * 40,
-                "html_url": f"https://github.com/me/subs/commit/{'a' * 40}",
-                "files": ["subs/My Video.srt", "subs/My Video.vtt"],
-                "repo": "me/subs",
-                "branch": "main",
-            }
-            body = {
-                "job_id": job_id,
-                "repo": "me/subs",
-                "branch": "main",
-                "folder": "subs",
-                "files": ["srt", "vtt"],
-                "message": "Add Arabic subs",
-                "token": "ghp_test_token",
-            }
-            pushed = client.post("/api/github/push", json=body)
-            check(pushed.status_code == 200, "POST /api/github/push → 200")
-            data = pushed.json()
-            check(data["ok"] is True and data["commit_sha"] == "a" * 40,
-                  "commit sha returned")
-            check(data["html_url"].startswith("https://github.com/"),
-                  "commit html_url returned")
-            check(push_mock.call_count == 1, "push_files called exactly once")
-            args = push_mock.call_args.args
-            check(args[0] == "ghp_test_token", "token forwarded to pusher")
-            check(args[1] == "me/subs" and args[2] == "main", "repo + branch forwarded")
-            check(args[3] == "Add Arabic subs", "commit message forwarded")
-            pushed_paths = [path for path, _ in args[4]]
-            check(pushed_paths == ["subs/My Video.srt", "subs/My Video.vtt"],
-                  "folder-prefixed stem filenames built")
-            srt_payload = args[4][0][1].decode("utf-8")
-            check(srt_payload.startswith("1\n00:00:00,000 -->"), "SRT payload serialized")
-            check("سطر معدل" in srt_payload, "edited cues are what gets pushed")
-            check(b"\xef\xbb\xbf" not in args[4][0][1], "no BOM when option is off")
-            pushed_logs = "\n".join(client.get(f"/api/status/{job_id}").json()["logs"])
-            check("Pushed 2 file(s)" in pushed_logs, "push logged to the job log")
-
-            # GitHub API failures surface as 400 + readable detail
-            push_mock.side_effect = web.github_push.GitHubError("boom: no access", 403)
-            failed = client.post("/api/github/push", json=body)
-            check(failed.status_code == 400 and "boom" in failed.json()["detail"],
-                  "GitHubError → 400 with detail")
-            push_mock.side_effect = None
-
-            # token: env fallback works, no token at all → 400
-            push_mock.return_value["files"] = ["My Video.srt"]
-            with mock.patch.dict(os.environ, {"GITHUB_TOKEN": "ghp_env_token"}):
-                env_push = client.post(
-                    "/api/github/push", json={**body, "token": "", "folder": ""}
-                )
-                check(env_push.status_code == 200, "GITHUB_TOKEN env fallback → 200")
-                check(push_mock.call_args.args[0] == "ghp_env_token", "env token used")
-                check(push_mock.call_args.args[4][0][0] == "My Video.srt",
-                      "empty folder → no prefix")
-            with mock.patch.dict(os.environ, {"GITHUB_TOKEN": ""}):
-                no_token = client.post(
-                    "/api/github/push", json={**body, "token": ""}
-                )
-                check(no_token.status_code == 400, "missing token → 400")
-
-        # validation + missing-artifact paths (never reach push_files)
-        ghost = client.post(
-            "/api/github/push", json={**body, "job_id": "nope", "folder": ""}
-        )
-        check(ghost.status_code == 404, "unknown job → 404")
-        bad_repo = client.post(
-            "/api/github/push", json={**body, "repo": "just-a-name", "folder": ""}
-        )
-        check(bad_repo.status_code == 422, "bad repo format → 422")
-        bad_files = client.post(
-            "/api/github/push", json={**body, "repo": "me/subs", "files": ["exe"],
-                                      "folder": ""}
-        )
-        check(bad_files.status_code == 422, "unsupported file type → 422")
-        no_files = client.post(
-            "/api/github/push", json={**body, "repo": "me/subs", "files": [],
-                                      "folder": ""}
-        )
-        check(no_files.status_code == 422, "empty file list → 422")
-        video_missing = client.post(
-            "/api/github/push", json={**body, "repo": "me/subs",
-                                      "files": ["video"], "folder": "", "token": "x"}
-        )
-        check(video_missing.status_code == 404, "burned video not produced → 404")
 
         print("== Retry & resume (failed translation) ==")
         check(client.post(f"/api/job/{job_id}/retry").status_code == 409,
@@ -461,11 +435,83 @@ def main() -> None:
             check(bool(second["has_subtitles"]), "subtitles produced on retry")
         client.delete(f"/api/job/{job3}")
 
+        print("== Offline engine (argos) ==")
+        core.translate.reset_fallback()
+        local_calls = {"n": 0}
+
+        def fake_local(chunk, source="en", target="ar", cancel_event=None,
+                       on_note=None, **_kw):
+            local_calls["n"] += 1
+            return fake_translate(list(chunk), source=source, target=target)
+
+        with mock.patch("core.translate.translate_batch", REAL_TRANSLATE_BATCH), \
+             mock.patch("core.translate.offline_available", return_value=True), \
+             mock.patch("core.translate._offline_translate_batch", side_effect=fake_local):
+            up4 = client.post(
+                "/api/upload",
+                files={"file": ("offline.mp4", io.BytesIO(payload), "video/mp4")},
+                data={"model_size": "small", "engine": "argos"},
+            )
+            check(up4.status_code == 200, "upload with engine=argos → 200")
+            job4 = up4.json()["job_id"]
+            status4 = wait_terminal(client, job4, timeout=30)
+        check(status4["stage"] == "done", "offline engine job → done")
+        check(local_calls["n"] >= 1, "offline translator used (Google untouched)")
+        subs4 = client.get(f"/api/subtitles/{job4}").json()
+        check(bool(subs4["cues"]) and subs4["cues"][0]["text"].startswith("مرحباً"),
+              "Arabic subtitles produced offline")
+        client.delete(f"/api/job/{job4}")
+
+        print("== Google down → automatic offline fallback ==")
+        core.translate.reset_fallback()
+        fb_calls = {"n": 0}
+
+        def fb_local(chunk, *args, **kw):
+            fb_calls["n"] += 1
+            return fake_translate(list(chunk))
+
+        class DeadGoogle:
+            """Always rate-limits — the current Google-429 situation."""
+
+            def translate(self, text):
+                raise RuntimeError(
+                    "429 Too Many Requests: too many requests to the server"
+                )
+
+        with mock.patch("core.translate.translate_batch", REAL_TRANSLATE_BATCH), \
+             mock.patch("core.translate._get_translator",
+                        side_effect=lambda *a, **k: DeadGoogle()), \
+             mock.patch.object(core.translate, "RATE_LIMIT_DELAYS", (0.0,)), \
+             mock.patch.object(core.translate, "TRANSIENT_DELAYS", (0.0,)), \
+             mock.patch("core.translate.offline_available", return_value=True), \
+             mock.patch("core.translate._offline_translate_batch", side_effect=fb_local):
+            up5 = client.post(
+                "/api/upload",
+                files={"file": ("google down.mp4", io.BytesIO(payload), "video/mp4")},
+                data={"model_size": "small", "engine": "google"},
+            )
+            check(up5.status_code == 200, "upload with dead Google → 200")
+            job5 = up5.json()["job_id"]
+            status5 = wait_terminal(client, job5, timeout=30)
+        check(status5["stage"] == "done", "job completes despite Google 429 (fallback)")
+        check(fb_calls["n"] >= 1, "offline translator took over")
+        logs5 = "\n".join(status5["logs"])
+        check("switched to the offline translator" in logs5,
+              "fallback announced in the job log")
+        check(core.translate._google_is_blocked(), "Google cooldown window armed")
+        core.translate.reset_fallback()
+        check(not core.translate._google_is_blocked(), "cooldown window resettable")
+        subs5 = client.get(f"/api/subtitles/{job5}").json()
+        check(bool(subs5["cues"]), "fallback job has subtitles")
+        client.delete(f"/api/job/{job5}")
+
         print("== Cleanup ==")
         job_dir = manager.get(job_id).dir
         check(job_dir.exists(), "job dir exists before delete")
         check(client.delete(f"/api/job/{job_id}").status_code == 200, "DELETE job → 200")
         check(not job_dir.exists(), "job dir removed")
+        check(next(out_dir.glob("*.srt")).exists(), "save-folder copies survive job deletion")
+        shutil.rmtree(out_dir, ignore_errors=True)
         check(client.get(f"/api/status/{job_id}").status_code == 404, "status → 404 after delete")
 
         print("== Error path ==")

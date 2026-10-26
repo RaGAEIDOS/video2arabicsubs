@@ -55,7 +55,14 @@ def url_support() -> bool:
 
 
 class Job:
-    def __init__(self, options: JobOptions, source: str, original_filename: str, job_dir: Path):
+    def __init__(
+        self,
+        options: JobOptions,
+        source: str,
+        original_filename: str,
+        job_dir: Path,
+        output_dir: Optional[str] = None,
+    ):
         self.id = uuid.uuid4().hex
         self.options = options
         self.source = source                      # "upload" | "url"
@@ -64,6 +71,8 @@ class Job:
         stem = Path(original_filename or "video").stem.strip() or "video"
         self.stem = "".join(ch if ch.isalnum() or ch in " -_()" else "_" for ch in stem)[:120]
         self.dir = job_dir
+        # Optional user-chosen folder that receives the generated files.
+        self.output_dir: Optional[str] = (output_dir or "").strip() or None
 
         self.stage: Stage = Stage.QUEUED
         self.percent: float = 0.0
@@ -105,6 +114,7 @@ class Job:
                 "duration": self.duration,
                 "original_filename": self.original_filename,
                 "source": self.source,
+                "output_dir": self.output_dir,
                 "options": self.options.to_dict(),
                 "has_subtitles": self.cues is not None,
                 "files": sorted(self.files.keys()),
@@ -146,6 +156,29 @@ class Job:
         with self._lock:
             self.updated_at = time.time()
             self._append_log(text, self.updated_at)
+
+    def copy_outputs(self) -> None:
+        """Copy the generated files into the user-chosen save folder."""
+        if not self.output_dir:
+            return
+        dest = Path(self.output_dir)
+        try:
+            dest.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            self.add_log(f"⚠ Save folder not usable: {exc}")
+            return
+        copied: List[str] = []
+        for src in list(self.files.values()):
+            src_path = Path(src)
+            if not src_path.exists():
+                continue
+            try:
+                shutil.copy2(src_path, dest / src_path.name)
+                copied.append(src_path.name)
+            except OSError as exc:
+                self.add_log(f"⚠ Could not copy {src_path.name} to the save folder: {exc}")
+        if copied:
+            self.add_log(f"💾 Saved to {dest}: {', '.join(copied)}")
 
     def apply_event(self, event: ProgressEvent) -> None:
         """Consume a :class:`ProgressEvent` emitted by the pipeline."""
@@ -294,12 +327,18 @@ class JobManager:
         return removed
 
     # ── registry ──────────────────────────────────────────────────────
-    def create(self, options: JobOptions, source: str, original_filename: str) -> Job:
+    def create(
+        self,
+        options: JobOptions,
+        source: str,
+        original_filename: str,
+        output_dir: Optional[str] = None,
+    ) -> Job:
         with self._lock:
             job_id = uuid.uuid4().hex
             job_dir = JOBS_DIR / job_id
             job_dir.mkdir(parents=True, exist_ok=True)
-            job = Job(options, source, original_filename, job_dir)
+            job = Job(options, source, original_filename, job_dir, output_dir=output_dir)
             job.id = job_id
             self._jobs[job.id] = job
             return job
@@ -378,6 +417,7 @@ class JobManager:
                 job.warnings = result.warnings
             for warning in result.warnings:
                 job.add_log(f"⚠ {warning}")
+            job.copy_outputs()  # results land in the user-chosen save folder
             job.set_terminal(Stage.DONE, log=f"Done — {len(result.cues)} subtitle cue(s)")
 
         except PipelineCancelled:

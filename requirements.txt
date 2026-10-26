@@ -5,6 +5,11 @@ moviepy
 imageio-ffmpeg
 pysrt
 
+# ── Offline Arabic fallback (used automatically when Google is rate-limited,
+#    or via the «العربية (بدون إنترنت)» option — downloads a ~100 MB language
+#    package once, then works fully offline) ──
+argostranslate
+
 # ── Desktop (Tkinter) app ──
 pystray>=0.19.0
 Pillow>=9.2.0

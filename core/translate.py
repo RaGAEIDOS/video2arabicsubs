@@ -3,7 +3,13 @@
 Engines:
 
 * ``google`` — Google Translate via ``deep-translator`` (default, online),
+* ``argos``  — **offline** translation via Argos Translate (no internet),
 * ``none``   — passthrough (video is already Arabic / user wants no translation).
+
+When Google is rate-limited (429) and its backoff budget is exhausted, the
+``google`` engine **automatically falls back to the offline translator** for
+a cooldown window (``GOOGLE_FALLBACK_COOLDOWN``) instead of failing the job —
+and goes back to Google by itself once the window passes.
 
 Fixes over the original ``app/translator.py``:
 
@@ -41,10 +47,24 @@ MAX_ITEMS_PER_BATCH = 40
 MIN_REQUEST_INTERVAL = 0.30
 REQUEST_JITTER = 0.15
 
-#: Transient failures (rate limits, network, 5xx) are retried with
-#: exponential backoff: 2s, 4s, 8s, 16s (30s total budget per request).
-RETRY_ATTEMPTS = 5
-BACKOFF_BASE_SECONDS = 2.0
+#: Backoff schedules (seconds to wait before each retry). A Google 429 is a
+#: *cooldown* that lasts minutes, so rate-limit errors get a much longer
+#: budget than ordinary network blips.
+TRANSIENT_DELAYS = (2, 4, 8, 16)           # 5 attempts, ~30s total
+RATE_LIMIT_DELAYS = (5, 15, 30, 60, 120)   # 6 attempts, ~4min total
+
+#: Offline fallback engine (Argos Translate). Used when the user picks
+#: ``engine="argos"``, and automatically while Google is unreachable.
+OFFLINE_ENGINE = "argos"
+
+#: After Google gives up (full backoff exhausted), skip it for this long and
+#: translate locally; afterwards Google gets another chance by itself.
+GOOGLE_FALLBACK_COOLDOWN = 600.0  # seconds
+
+_google_lock = threading.Lock()
+_google_blocked_until = 0.0
+_offline_pair_cache: Dict[tuple, object] = {}
+_offline_install_lock = threading.Lock()
 
 #: Errors worth retrying (matched against the exception text).
 _TRANSIENT_MARKERS = (
@@ -54,6 +74,7 @@ _TRANSIENT_MARKERS = (
     " 500", " 502", " 503", "reset by peer", "broken pipe", "unreachable",
     "empty result", "unexpected result", "max retries", "proxy", "ssl",
 )
+_RATE_LIMIT_MARKERS = ("too many requests", "429", "rate limit", "rate-limit", "quota")
 
 _translator_lock = threading.Lock()
 _translators: Dict[tuple, object] = {}
@@ -105,35 +126,61 @@ def _throttle(cancel_event=None) -> None:
         _sleep(wait, cancel_event)
 
 
-def _backoff_delay(attempt: int) -> float:
-    return BACKOFF_BASE_SECONDS * (2 ** attempt) + random.uniform(0.0, 0.5)
-
-
 def _is_transient(exc: BaseException) -> bool:
     text = f"{type(exc).__name__}: {exc}".lower()
     return any(marker in text for marker in _TRANSIENT_MARKERS)
 
 
-def _request(call, cancel_event=None) -> str:
-    """Throttle + retry wrapper around a single Google request."""
+def _is_rate_limit(exc: BaseException) -> bool:
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return any(marker in text for marker in _RATE_LIMIT_MARKERS)
+
+
+def _request(call, cancel_event=None, on_note=None) -> str:
+    """Throttle + retry wrapper around a single Google request.
+
+    Rate-limit errors (Google 429 — a cooldown of minutes) retry on the long
+    ``RATE_LIMIT_DELAYS`` schedule; other transient errors use the short one.
+    ``on_note`` (if given) is called with a human-readable message before
+    each wait so the UI can show why the job is pausing.
+    """
     last: Optional[BaseException] = None
-    for attempt in range(RETRY_ATTEMPTS):
+    attempt = 0
+    while True:
         _throttle(cancel_event)
         try:
             out = call()
         except PipelineCancelled:
             raise
         except Exception as exc:  # noqa: BLE001 — classified below
-            last = exc
             if not _is_transient(exc):
+                last = exc
                 break
+            last = exc
+            delays = RATE_LIMIT_DELAYS if _is_rate_limit(exc) else TRANSIENT_DELAYS
         else:
             if isinstance(out, str) and out.strip():
                 return out.strip()
             last = RuntimeError("Translation service returned an empty result")
-        if attempt + 1 < RETRY_ATTEMPTS:
-            _sleep(_backoff_delay(attempt), cancel_event)
-    raise RuntimeError(f"Translation failed: {last}") from last
+            delays = TRANSIENT_DELAYS
+        if attempt >= len(delays):
+            break
+        delay = delays[attempt] + random.uniform(0.0, 0.5)
+        attempt += 1
+        if on_note is not None:
+            try:
+                why = "Rate-limited by Google" if _is_rate_limit(last) else "Transient error"
+                on_note(f"{why} — waiting {delay:.0f}s before retry {attempt}/{len(delays)}…")
+            except Exception:  # noqa: BLE001 — a broken note hook must not kill the job
+                pass
+        _sleep(delay, cancel_event)
+    hint = ""
+    if _is_rate_limit(last):
+        hint = (
+            " — Google is rate-limiting this connection. Wait a few minutes, "
+            "then press ↻ Retry (your transcript and translations are saved)."
+        )
+    raise RuntimeError(f"Translation failed: {last}{hint}") from last
 
 
 def _pack_indices(indices: Sequence[int], texts: Sequence[str]) -> List[List[int]]:
@@ -155,12 +202,12 @@ def _pack_indices(indices: Sequence[int], texts: Sequence[str]) -> List[List[int
     return batches
 
 
-def _translate_one(translator, text: str, cancel_event=None) -> str:
-    return _request(lambda: translator.translate(text), cancel_event)
+def _translate_one(translator, text: str, cancel_event=None, on_note=None) -> str:
+    return _request(lambda: translator.translate(text), cancel_event, on_note)
 
 
 def _translate_chunk(
-    translator, chunk: List[str], cancel_event=None
+    translator, chunk: List[str], cancel_event=None, on_note=None
 ) -> List[str]:
     """Translate one batch with a *single* HTTP request when possible.
 
@@ -171,15 +218,146 @@ def _translate_chunk(
     requests for that batch only — correctness always wins.
     """
     if len(chunk) == 1 or any("\n" in t or "\r" in t for t in chunk):
-        return [_translate_one(translator, text, cancel_event) for text in chunk]
+        return [_translate_one(translator, text, cancel_event, on_note) for text in chunk]
 
     payload = "\n".join(chunk)
-    joined = _request(lambda: translator.translate(payload), cancel_event)
+    joined = _request(lambda: translator.translate(payload), cancel_event, on_note)
     lines = joined.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     if len(lines) == len(chunk) and all(line.strip() for line in lines):
         return [line.strip() for line in lines]
     # Line structure changed → do it the slow, exact way.
-    return [_translate_one(translator, text, cancel_event) for text in chunk]
+    return [_translate_one(translator, text, cancel_event, on_note) for text in chunk]
+
+
+# ── Offline engine (Argos Translate) ───────────────────────────────────────
+def offline_available() -> bool:
+    """True when ``argostranslate`` (the offline engine) is importable."""
+    try:
+        import argostranslate.translate  # noqa: F401
+        return True
+    except Exception:  # noqa: BLE001 — absence must never break the app
+        return False
+
+
+def _offline_pair(source: str, target: str):
+    """Installed Argos translation object for source→target, or ``None``."""
+    src = (source or "en").strip().lower()
+    if not src or src == "auto":
+        src = "en"  # this project assumes English speech (whisper gives real codes)
+    key = (src, target)
+    cached = _offline_pair_cache.get(key)
+    if cached is not None:
+        return cached
+    try:
+        from argostranslate import translate as argos
+
+        # Official lookup (handles this version's translations_from layout).
+        translation = argos.get_translation_from_codes(src, target)
+    except Exception:  # noqa: BLE001 — not installed / unknown code
+        return None
+    if translation is None:
+        return None
+    try:
+        if translation.from_lang.code != src or translation.to_lang.code != target:
+            return None  # identity / pivot wrappers are not what we asked for
+    except Exception:  # noqa: BLE001
+        return None
+    _offline_pair_cache[key] = translation
+    return translation
+
+
+def ensure_offline_package(on_note=None) -> None:
+    """Download + install the English→Arabic offline package once (~100 MB).
+
+    After the first successful run the package lives on disk and every later
+    translation works with **no internet at all**.
+    """
+    if _offline_pair("en", "ar") is not None:
+        return
+    with _offline_install_lock:
+        if _offline_pair("en", "ar") is not None:
+            return
+        if not offline_available():
+            raise RuntimeError(
+                "Offline translator not installed — run: pip install argostranslate"
+            )
+        try:
+            from argostranslate import package as argos_package
+
+            argos_package.update_package_index()
+            candidates = [
+                p
+                for p in argos_package.get_available_packages()
+                if getattr(p, "from_code", None) == "en"
+                and getattr(p, "to_code", None) == "ar"
+            ]
+            if not candidates:
+                raise RuntimeError("no English→Arabic package in the index")
+            _note(on_note, "Downloading the offline translation package (~100 MB) — one time only…")
+            argos_package.install_from_path(candidates[0].download())
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(
+                f"Offline translation package unavailable: {exc}. "
+                "Check the internet once (it downloads a single time), "
+                "or choose Google / English as the translation language."
+            ) from exc
+        if _offline_pair("en", "ar") is None:
+            raise RuntimeError("Offline package installed but not detected — restart the app")
+
+
+def _offline_translate_batch(
+    chunk: Sequence[str],
+    source: str,
+    target: str,
+    cancel_event=None,
+    on_note=None,
+) -> List[str]:
+    """Translate one batch locally with Argos (no network after install)."""
+    ensure_offline_package(on_note)
+    pair = _offline_pair(source, target)
+    if pair is None:
+        raise RuntimeError(
+            f"Offline translator has no {source or 'auto'}→{target} pair "
+            "(English→Arabic is what it ships with)"
+        )
+    out: List[str] = []
+    for text in chunk:
+        if cancel_event is not None and cancel_event.is_set():
+            raise PipelineCancelled()
+        try:
+            value = pair.translate(text)
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"Offline translation failed: {exc}") from exc
+        out.append((value or "").strip() or text)
+    return out
+
+
+def _note(on_note, message: str) -> None:
+    """Emit a notice without letting a broken hook kill the job."""
+    if on_note is None:
+        return
+    try:
+        on_note(message)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def reset_fallback() -> None:
+    """Clear the Google-cooldown window (tests / manual recovery)."""
+    global _google_blocked_until
+    with _google_lock:
+        _google_blocked_until = 0.0
+
+
+def _google_is_blocked() -> bool:
+    with _google_lock:
+        return time.monotonic() < _google_blocked_until
+
+
+def _mark_google_blocked() -> None:
+    global _google_blocked_until
+    with _google_lock:
+        _google_blocked_until = time.monotonic() + GOOGLE_FALLBACK_COOLDOWN
 
 
 def translate_batch(
@@ -191,6 +369,7 @@ def translate_batch(
     cancel_event=None,
     known: Optional[Mapping[str, str]] = None,
     on_batch: Optional[Callable[[Sequence[str], Sequence[str]], None]] = None,
+    on_note: Optional[Callable[[str], None]] = None,
 ) -> List[str]:
     """Translate a list of strings, returning a list of the same length.
 
@@ -199,7 +378,9 @@ def translate_batch(
 
     ``known`` maps already-translated source texts to their translations
     (used to resume an interrupted job); ``on_batch`` is invoked with every
-    freshly translated batch so callers can persist progress incrementally.
+    freshly translated batch so callers can persist progress incrementally;
+    ``on_note`` receives human-readable notices (e.g. "waiting Ns before
+    retry") so callers can show why the job appears to pause.
     """
     texts = list(texts)
     if on_progress is None:
@@ -246,14 +427,51 @@ def translate_batch(
         on_progress(1.0)
         return results
 
-    translator = _get_translator(source, target)
+    # ── Engine routing: offline (argos), Google, or Google→offline fallback ──
+    if engine == OFFLINE_ENGINE and not offline_available():
+        raise RuntimeError(
+            "Offline translator not installed — run: pip install argostranslate "
+            "(then it works without internet), or choose Google / English instead."
+        )
+    use_offline = engine == OFFLINE_ENGINE or (
+        engine == "google" and _google_is_blocked() and offline_available()
+    )
+    translator = None if use_offline else _get_translator(source, target)
     total = len(pending)
 
     for batch in _pack_indices(fresh, texts):
         if cancel_event is not None and cancel_event.is_set():
             raise PipelineCancelled()
         chunk = [texts[i].strip() for i in batch]
-        translated = _translate_chunk(translator, chunk, cancel_event)
+        if use_offline:
+            translated = _offline_translate_batch(
+                chunk, source, target, cancel_event, on_note
+            )
+        else:
+            try:
+                translated = _translate_chunk(translator, chunk, cancel_event, on_note)
+            except RuntimeError as google_exc:
+                # Google exhausted its backoff → keep the job alive offline.
+                if engine != "google" or not offline_available():
+                    raise
+                _mark_google_blocked()
+                use_offline = True
+                translator = None
+                try:
+                    translated = _offline_translate_batch(
+                        chunk, source, target, cancel_event, on_note
+                    )
+                except PipelineCancelled:
+                    raise
+                except Exception as local_exc:  # noqa: BLE001
+                    raise RuntimeError(
+                        f"{google_exc}\nOffline fallback unavailable: {local_exc}"
+                    ) from google_exc
+                _note(
+                    on_note,
+                    "⚠ Google unavailable — switched to the offline translator "
+                    "for this run (no internet needed from here on)",
+                )
         for i, value in zip(batch, translated):
             results[i] = value
         if on_batch is not None:

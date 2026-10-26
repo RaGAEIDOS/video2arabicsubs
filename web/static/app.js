@@ -18,18 +18,19 @@ const I18N = {
     'upload.urlHint': 'يتطلب تثبيت yt-dlp على الخادم.',
     'opt.title': 'خيارات المعالجة',
     'opt.model': 'نموذج Whisper',
-    'opt.lang': 'لغة الفيديو',
-    'opt.langHint': '«تلقائي» يكتشف Whisper لغة الكلام تلقائياً.',
-    'opt.engine': 'محرك الترجمة',
-    'opt.engineGoogle': 'Google (عبر الإنترنت)',
-    'opt.engineNone': 'بدون — الفيديو عربي أصلاً',
+    'opt.engine': 'لغة الترجمة',
+    'opt.engineGoogle': 'العربية (ترجمة جوجل)',
+    'opt.engineLocal': 'العربية (بدون إنترنت — محلي)',
+    'opt.engineNone': 'الإنجليزية (بدون ترجمة)',
     'opt.format': 'صيغة الملف',
     'opt.fmtBoth': 'SRT + VTT',
+    'opt.outDir': '📁 مجلد حفظ الناتج (اختياري)',
+    'opt.outDirPh': '/home/meuor/Videos/subtitles',
+    'opt.outDirHint': 'تُنسخ ملفات الترجمة (والفيديو المُحروق) إلى هذا المجلد على الخادم فور انتهاء المعالجة.',
     'opt.burn': 'حرق الترجمة داخل نسخة من الفيديو',
     'opt.burnBadge': 'FFmpeg',
     'opt.burnUnavailable': 'الحرق غير متاح',
     'opt.bom': 'كتابة الملفات بترميز UTF-8 مع BOM (توافق Windows)',
-    'opt.auto': 'تلقائي (اكتشاف)',
     'btn.start': '▶ ابدأ الترجمة',
     'btn.startHint': 'اختر ملفاً أولاً',
     'btn.startHintUrl': 'أدخل رابط الفيديو أولاً',
@@ -48,28 +49,6 @@ const I18N = {
     'dl.srt': '⬇ SRT',
     'dl.vtt': '⬇ VTT',
     'dl.video': '⬇ الفيديو المُحروق',
-    'gh.title': 'رفع النتائج إلى GitHub',
-    'gh.sub': 'ارفع ملفات الترجمة (والفيديو المُحروق) إلى أي مستودع GitHub لديك صلاحية الكتابة فيه — يتم الرفع من خادمك المحلي في التزام واحد.',
-    'gh.repo': 'المستودع',
-    'gh.repoPh': 'owner/repo',
-    'gh.branch': 'الفرع',
-    'gh.branchPh': 'main',
-    'gh.folder': 'المجلد داخل المستودع',
-    'gh.folderPh': 'subtitles (اختياري)',
-    'gh.token': 'رمز الوصول الشخصي (PAT)',
-    'gh.tokenPh': 'ghp_… (اتركه فارغاً إذا ضُبط GITHUB_TOKEN)',
-    'gh.message': 'رسالة الالتزام (اختياري)',
-    'gh.messagePh': 'إضافة ترجمة عربية للفيديو',
-    'gh.files': 'الملفات المُرفوعة',
-    'gh.push': '⬆ رفع إلى GitHub',
-    'gh.pushing': 'جاري الرفع إلى GitHub…',
-    'gh.done': '✓ تم الرفع',
-    'gh.failed': 'فشل الرفع',
-    'gh.openCommit': 'فتح الالتزام ↗',
-    'gh.noFiles': 'اختر ملفاً واحداً على الأقل',
-    'gh.badRepo': 'اكتب اسم المستودع بالشكل owner/repo',
-    'gh.tokenEnv': 'ضُبط GITHUB_TOKEN على الخادم — يمكنك ترك خانة الرمز فارغة.',
-    'gh.tokenPat': 'يحتاج رمز PAT بصلاحية «Contents: Read and write» — الرمز يُرسل إلى خادمك المحلي فقط ولا يُخزَّن في المتصفح.',
     'editor.count': 'عدد الأسطر',
     'editor.add': '＋ سطر',
     'editor.save': '💾 حفظ التعديلات',
@@ -108,18 +87,19 @@ const I18N = {
     'upload.urlHint': 'Requires yt-dlp installed on the server.',
     'opt.title': 'Processing options',
     'opt.model': 'Whisper model',
-    'opt.lang': 'Source language',
-    'opt.langHint': '"Auto" lets Whisper detect the spoken language.',
-    'opt.engine': 'Translation engine',
-    'opt.engineGoogle': 'Google (online)',
-    'opt.engineNone': 'None — video is already Arabic',
+    'opt.engine': 'Subtitle language',
+    'opt.engineGoogle': 'Arabic (Google translation)',
+    'opt.engineLocal': 'Arabic (offline — local)',
+    'opt.engineNone': 'English (no translation)',
     'opt.format': 'Output format',
     'opt.fmtBoth': 'SRT + VTT',
+    'opt.outDir': '📁 Save-to folder (optional)',
+    'opt.outDirPh': '/home/meuor/Videos/subtitles',
+    'opt.outDirHint': 'Subtitle files (and the burned video) are copied to this folder on the server as soon as processing finishes.',
     'opt.burn': 'Burn subtitles into a copy of the video',
     'opt.burnBadge': 'FFmpeg',
     'opt.burnUnavailable': 'Burn-in unavailable',
     'opt.bom': 'Write files as UTF-8 with BOM (Windows players)',
-    'opt.auto': 'Auto-detect',
     'btn.start': '▶ Start',
     'btn.startHint': 'Choose a file first',
     'btn.startHintUrl': 'Enter a video URL first',
@@ -138,28 +118,6 @@ const I18N = {
     'dl.srt': '⬇ SRT',
     'dl.vtt': '⬇ VTT',
     'dl.video': '⬇ Burned video',
-    'gh.title': 'Push results to GitHub',
-    'gh.sub': 'Upload the subtitle files (and the burned video) to any GitHub repo you can write to — pushed from your local server in a single commit.',
-    'gh.repo': 'Repository',
-    'gh.repoPh': 'owner/repo',
-    'gh.branch': 'Branch',
-    'gh.branchPh': 'main',
-    'gh.folder': 'Folder inside the repo',
-    'gh.folderPh': 'subtitles (optional)',
-    'gh.token': 'Personal access token (PAT)',
-    'gh.tokenPh': 'ghp_… (leave empty if GITHUB_TOKEN is set)',
-    'gh.message': 'Commit message (optional)',
-    'gh.messagePh': 'Add Arabic subtitles for the video',
-    'gh.files': 'Files',
-    'gh.push': '⬆ Push to GitHub',
-    'gh.pushing': 'Pushing to GitHub…',
-    'gh.done': '✓ Pushed',
-    'gh.failed': 'Push failed',
-    'gh.openCommit': 'Open commit ↗',
-    'gh.noFiles': 'Choose at least one file',
-    'gh.badRepo': "Enter the repository as owner/repo",
-    'gh.tokenEnv': 'GITHUB_TOKEN is set on the server — the token field can stay empty.',
-    'gh.tokenPat': 'Needs a PAT with "Contents: Read and write" — the token is sent only to your local server and never stored in the browser.',
     'editor.count': 'Cues',
     'editor.add': '＋ Add cue',
     'editor.save': '💾 Save edits',
@@ -242,7 +200,6 @@ const state = {
   editorLoaded: false,
   cueDirty: false,
   previewTimer: null,
-  ghFiles: new Set(['srt', 'vtt']),
 };
 
 /* ── tiny helpers ─────────────────────────────────────────────────── */
@@ -359,8 +316,6 @@ function applyI18n() {
   renderStepper();
   renderStageLabel();
   renderDownloadBar();
-  renderGhFiles();
-  renderGhHint();
   updateStartHint();
 }
 
@@ -379,22 +334,6 @@ function populateOptions() {
   });
   modelSel.value = h.models.includes(current) ? current : h.defaults.model_size;
   $('optModelHint').textContent = '';
-
-  const langSel = $('optLang');
-  const curLang = langSel.value || h.defaults.source_language;
-  langSel.innerHTML = '';
-  const auto = document.createElement('option');
-  auto.value = 'auto';
-  auto.textContent = t('opt.auto');
-  langSel.appendChild(auto);
-  Object.entries(h.languages).forEach(([code, name]) => {
-    if (code === 'auto') return;
-    const opt = document.createElement('option');
-    opt.value = code;
-    opt.textContent = `${name} (${code})`;
-    langSel.appendChild(opt);
-  });
-  langSel.value = curLang && langSel.querySelector(`option[value="${curLang}"]`) ? curLang : 'auto';
 
   $('maxSizeLabel').textContent = `${h.max_upload_mb} MB`;
 
@@ -480,11 +419,12 @@ function updateStartHint() {
 function collectOptions() {
   return {
     model_size: $('optModel').value,
-    source_language: $('optLang').value,
+    source_language: 'en',   // the project targets English videos only
     engine: $('optEngine').value,
     output_format: $('optFormat').value,
     burn_video: $('optBurn').checked,
     add_bom: $('optBom').checked,
+    output_dir: $('optOutDir').value.trim(),
   };
 }
 
@@ -768,7 +708,6 @@ async function loadEditor() {
     }
     renderCues();
     renderDownloadBar();
-    renderGhFiles();
     syncTrack();
     $('resultSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) {
@@ -1015,101 +954,6 @@ function renderDownloadBar() {
   if (files.includes('video')) bar.appendChild(makePill('video', 'dl.video', false));
 }
 
-/* ── GitHub push ──────────────────────────────────────────────────── */
-function renderGhFiles() {
-  const box = $('ghFiles');
-  if (!box) return;
-  const files = (state.job && state.job.files) || [];
-  // drop formats that are no longer available for this job
-  Array.from(state.ghFiles).forEach((key) => {
-    if (key !== 'srt' && key !== 'vtt' && !files.includes(key)) state.ghFiles.delete(key);
-  });
-  box.innerHTML = '';
-  const addBox = (key, label) => {
-    if (key === 'video' && !files.includes('video')) return;
-    const row = document.createElement('label');
-    row.className = 'check-row';
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.className = 'check';
-    input.checked = state.ghFiles.has(key);
-    input.addEventListener('change', () => {
-      if (input.checked) state.ghFiles.add(key);
-      else state.ghFiles.delete(key);
-    });
-    const span = document.createElement('span');
-    span.textContent = label;
-    row.append(input, span);
-    box.appendChild(row);
-  };
-  addBox('srt', 'SRT');
-  addBox('vtt', 'VTT');
-  addBox('video', t('dl.video').replace('⬇ ', ''));
-}
-
-function renderGhHint() {
-  const hint = $('ghHint');
-  if (!hint) return;
-  const envOk = !!(state.health && state.health.github && state.health.github.env_token);
-  hint.textContent = envOk ? t('gh.tokenEnv') : t('gh.tokenPat');
-}
-
-function ghStatusBox(kind, text) {
-  const status = $('ghStatus');
-  const palette = {
-    busy: 'border-slate-700 bg-slate-900/60 text-slate-300',
-    ok: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-    err: 'border-red-500/40 bg-red-500/10 text-red-300',
-  };
-  status.className = `mt-3 rounded-xl border p-3 text-sm ${palette[kind] || palette.busy}`;
-  status.textContent = text;
-  return status;
-}
-
-async function pushToGitHub() {
-  if (!state.jobId) return;
-  const selected = Array.from(state.ghFiles);
-  if (!selected.length) { toast(t('gh.noFiles'), 'error'); return; }
-  const repo = $('ghRepo').value.trim();
-  if (!repo.includes('/')) { toast(t('gh.badRepo'), 'error'); $('ghRepo').focus(); return; }
-
-  const btn = $('ghPushBtn');
-  btn.disabled = true;
-  ghStatusBox('busy', t('gh.pushing'));
-  try {
-    const res = await fetchJSON('/api/github/push', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        job_id: state.jobId,
-        repo,
-        branch: $('ghBranch').value.trim() || 'main',
-        folder: $('ghFolder').value.trim(),
-        files: selected,
-        message: $('ghMsg').value.trim(),
-        token: $('ghToken').value.trim(),
-      }),
-    });
-    const status = ghStatusBox('ok', `${t('gh.done')} — ${res.files.length} · ${String(res.commit_sha || '').slice(0, 7)}`);
-    if (res.html_url) {
-      const link = document.createElement('a');
-      link.href = res.html_url;
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.className = 'mx-2 font-bold underline';
-      link.textContent = t('gh.openCommit');
-      status.appendChild(link);
-    }
-    toast(t('gh.done'), 'success');
-    appendLog(`⬆ ${t('gh.done')} → ${res.repo}@${res.branch} (${String(res.commit_sha || '').slice(0, 7)})`);
-  } catch (err) {
-    ghStatusBox('err', `${t('gh.failed')}: ${err.message}`);
-    toast(`${t('gh.failed')}: ${err.message}`, 'error', 8000);
-  } finally {
-    btn.disabled = false;
-  }
-}
-
 /* ── reset ────────────────────────────────────────────────────────── */
 async function newJob() {
   const id = state.jobId;
@@ -1134,14 +978,6 @@ async function newJob() {
   const retry = $('retryBtn');
   retry.classList.add('hidden');
   retry.disabled = false;
-  state.ghFiles = new Set(['srt', 'vtt']);
-  $('ghRepo').value = '';
-  $('ghFolder').value = '';
-  $('ghMsg').value = '';
-  $('ghToken').value = '';
-  ghStatusBox('busy', '');
-  $('ghStatus').classList.add('hidden');
-  renderGhFiles();
   const video = $('preview');
   video.pause();
   video.removeAttribute('src');
@@ -1235,7 +1071,9 @@ function bindEvents() {
   $('addCueBtn').addEventListener('click', addCue);
   $('saveCuesBtn').addEventListener('click', saveCues);
   $('dlBom').addEventListener('change', renderDownloadBar);
-  $('ghPushBtn').addEventListener('click', pushToGitHub);
+  $('optOutDir').addEventListener('change', () => {
+    localStorage.setItem('v2a_outdir', $('optOutDir').value.trim());
+  });
   $('logClear').addEventListener('click', () => { $('logBox').innerHTML = ''; });
 
   window.addEventListener('beforeunload', (e) => {
@@ -1247,6 +1085,7 @@ function bindEvents() {
 async function init() {
   bindEvents();
   applyI18n();
+  $('optOutDir').value = localStorage.getItem('v2a_outdir') || '';
   try {
     state.health = await fetchJSON('/api/health');
   } catch (err) {

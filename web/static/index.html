@@ -107,16 +107,11 @@
             </label>
 
             <label class="field">
-              <span class="field-label" data-i18n="opt.lang">لغة الفيديو</span>
-              <select id="optLang" class="input"></select>
-              <span class="field-hint" data-i18n="opt.langHint">«تلقائي» يكتشف Whisper لغة الكلام.</span>
-            </label>
-
-            <label class="field">
-              <span class="field-label" data-i18n="opt.engine">محرك الترجمة</span>
+              <span class="field-label" data-i18n="opt.engine">لغة الترجمة</span>
               <select id="optEngine" class="input">
-                <option value="google" data-i18n="opt.engineGoogle">Google (عبر الإنترنت)</option>
-                <option value="none" data-i18n="opt.engineNone">بدون — الفيديو عربي أصلاً</option>
+                <option value="google" data-i18n="opt.engineGoogle">العربية (ترجمة جوجل)</option>
+                <option value="argos" data-i18n="opt.engineLocal">العربية (بدون إنترنت)</option>
+                <option value="none" data-i18n="opt.engineNone">الإنجليزية (بدون ترجمة)</option>
               </select>
             </label>
 
@@ -127,6 +122,13 @@
                 <option value="srt">SRT</option>
                 <option value="vtt">WebVTT</option>
               </select>
+            </label>
+
+            <label class="field sm:col-span-2">
+              <span class="field-label" data-i18n="opt.outDir">📁 مجلد حفظ الناتج (اختياري)</span>
+              <input id="optOutDir" dir="ltr" class="input text-sm" placeholder="/home/meuor/Videos/subtitles"
+                data-i18n-ph="opt.outDirPh" />
+              <span class="field-hint" data-i18n="opt.outDirHint">تُنسخ ملفات الترجمة (والفيديو المُحروق) إلى هذا المجلد على الخادم فور انتهاء المعالجة.</span>
             </label>
           </div>
 
@@ -263,58 +265,6 @@
             <div id="cueList" class="cue-list"></div>
           </div>
         </div>
-      </div>
-
-      <!-- ══ GitHub push ══ -->
-      <div class="card">
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 class="card-title">
-            <span class="step-badge step-badge-done">5</span>
-            <span data-i18n="gh.title">رفع النتائج إلى GitHub</span>
-          </h2>
-        </div>
-        <p class="mb-4 max-w-3xl text-xs leading-relaxed text-slate-500" data-i18n="gh.sub">
-          ارفع ملفات الترجمة (والفيديو المُحروق) إلى أي مستودع GitHub لديك صلاحية الكتابة فيه —
-          يتم الرفع من خادمك المحلي في التزام واحد.
-        </p>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <label class="field">
-            <span class="field-label" data-i18n="gh.repo">المستودع</span>
-            <input id="ghRepo" dir="ltr" class="input font-mono text-sm" placeholder="owner/repo"
-              data-i18n-ph="gh.repoPh" />
-          </label>
-          <label class="field">
-            <span class="field-label" data-i18n="gh.branch">الفرع</span>
-            <input id="ghBranch" dir="ltr" class="input font-mono text-sm" value="main"
-              placeholder="main" data-i18n-ph="gh.branchPh" />
-          </label>
-          <label class="field">
-            <span class="field-label" data-i18n="gh.folder">المجلد داخل المستودع</span>
-            <input id="ghFolder" dir="ltr" class="input font-mono text-sm" placeholder="subtitles"
-              data-i18n-ph="gh.folderPh" />
-          </label>
-          <label class="field">
-            <span class="field-label" data-i18n="gh.token">رمز الوصول الشخصي (PAT)</span>
-            <input id="ghToken" type="password" dir="ltr" autocomplete="off"
-              class="input font-mono text-sm" placeholder="ghp_…" data-i18n-ph="gh.tokenPh" />
-          </label>
-          <label class="field sm:col-span-2 lg:col-span-4">
-            <span class="field-label" data-i18n="gh.message">رسالة الالتزام (اختياري)</span>
-            <input id="ghMsg" class="input text-sm" placeholder="إضافة ترجمة عربية للفيديو"
-              data-i18n-ph="gh.messagePh" />
-          </label>
-        </div>
-        <div class="mt-4 flex flex-wrap items-end justify-between gap-4">
-          <div class="field min-w-0 flex-1">
-            <span class="field-label" data-i18n="gh.files">الملفات المُرفوعة</span>
-            <div id="ghFiles" class="flex flex-wrap items-center gap-x-4 gap-y-2"></div>
-          </div>
-          <button id="ghPushBtn" class="btn btn-primary" data-i18n="gh.push">⬆ رفع إلى GitHub</button>
-        </div>
-        <p id="ghHint" class="field-hint mt-3">
-          يحتاج رمز PAT بصلاحية «Contents: Read and write» — الرمز يُرسل إلى خادمك المحلي فقط.
-        </p>
-        <div id="ghStatus" class="mt-3 hidden rounded-xl border p-3 text-sm"></div>
       </div>
     </section>
   </main>

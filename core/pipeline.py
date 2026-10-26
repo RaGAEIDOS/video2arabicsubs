@@ -113,6 +113,13 @@ class _Emitter:
         self._stage_has_detail = True
         self._emit(message)
 
+    def note(self, message: str) -> None:
+        """Log an informational message (e.g. a rate-limit wait) without
+        moving the progress bar."""
+        if self._stage is None:
+            return
+        self._emit(message, force=True)
+
     def finish(self, message: str = "") -> None:
         if self._stage is None:
             return
@@ -505,6 +512,7 @@ def run_pipeline(
                 cancel_event=cancel_event,
                 known=known,
                 on_batch=_on_batch,
+                on_note=emitter.note,
             )
         except PipelineCancelled:
             raise

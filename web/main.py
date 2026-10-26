@@ -16,7 +16,6 @@ Endpoints
 * ``PUT  /api/subtitles/{id}``  — save edited cues
 * ``GET  /api/download/{id}``   — UTF-8 ``.srt`` / ``.vtt`` / burned video
 * ``GET  /api/video/{id}``      — the uploaded video (Range-aware, for <video>)
-* ``POST /api/github/push``     — push results to a GitHub repo (one commit)
 * ``POST /api/cancel/{id}``     — cancel a running job
 * ``POST /api/job/{id}/retry``  — re-run a failed/cancelled job (resumes caches)
 * ``DELETE /api/job/{id}``      — cancel + delete job data immediately
@@ -41,9 +40,9 @@ from app import __version__
 from core import subtitles
 from core.models import Cue, JobOptions, Stage, LANGUAGES, MODEL_SIZES, ENGINES, OUTPUT_FORMATS
 from core.pipeline import burn_status
-from web import github_push, jobs as jobs_module
+from web import jobs as jobs_module
 from web.jobs import dumps, manager, url_support
-from web.schemas import GitHubPushRequest, SubtitleUpdate
+from web.schemas import SubtitleUpdate
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -149,7 +148,6 @@ def health() -> dict:
         "max_upload_mb": MAX_UPLOAD_MB,
         "url_support": url_support(),
         "burn": burn_status(),
-        "github": {"env_token": github_push.env_token_configured()},
         "defaults": {
             "model_size": "small",
             "source_language": "auto",
@@ -160,6 +158,24 @@ def health() -> dict:
 
 
 # ── jobs ──────────────────────────────────────────────────────────────────
+def _clean_output_dir(value: str) -> Optional[str]:
+    """Validate the user-chosen save folder (created eagerly → fails fast)."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    if len(value) > 500:
+        raise HTTPException(status_code=400, detail="Save folder path is too long")
+    path = Path(value).expanduser()
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        path = path.resolve()
+    except OSError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Cannot use the save folder: {exc}"
+        ) from exc
+    return str(path)
+
+
 @app.post("/api/upload")
 async def upload(
     request: Request,
@@ -170,6 +186,7 @@ async def upload(
     output_format: str = Form("both"),
     burn_video: bool = Form(False),
     add_bom: bool = Form(False),
+    output_dir: str = Form(""),
 ) -> dict:
     content_length = request.headers.get("content-length")
     if content_length:
@@ -193,7 +210,12 @@ async def upload(
     options = _build_options(
         model_size, source_language, engine, output_format, burn_video, add_bom
     )
-    job = manager.create(options=options, source="upload", original_filename=filename)
+    job = manager.create(
+        options=options,
+        source="upload",
+        original_filename=filename,
+        output_dir=_clean_output_dir(output_dir),
+    )
 
     dest = job.dir / f"source{ext}"
     written = 0
@@ -231,6 +253,7 @@ async def upload_url(
     output_format: str = Form("both"),
     burn_video: bool = Form(False),
     add_bom: bool = Form(False),
+    output_dir: str = Form(""),
 ) -> dict:
     url = url.strip()
     if not url.startswith(("http://", "https://")):
@@ -243,7 +266,12 @@ async def upload_url(
     options = _build_options(
         model_size, source_language, engine, output_format, burn_video, add_bom
     )
-    job = manager.create(options=options, source="url", original_filename=url)
+    job = manager.create(
+        options=options,
+        source="url",
+        original_filename=url,
+        output_dir=_clean_output_dir(output_dir),
+    )
     job.url = url
     job.add_log(f"Queued URL: {url}")
     manager.start(job)
@@ -387,6 +415,7 @@ def put_subtitles(job_id: str, body: SubtitleUpdate) -> dict:
                 pass
         job.updated_at = time.time()
     job.add_log(f"Subtitles edited in the browser — {len(cues)} cue(s)")
+    job.copy_outputs()  # keep the user-chosen save folder in sync with edits
     return {"ok": True, "job_id": job.id, "cues": len(cues)}
 
 
@@ -431,83 +460,6 @@ def download(
         else "text/vtt"
     )
     return _attachment(f"{job.stem}.{format}", media_type, content)
-
-
-# ── GitHub push ────────────────────────────────────────────────────────────
-def _push_payloads(
-    job: "jobs_module.Job", wanted: list, prefix: str, use_bom: bool
-) -> list:
-    """Build ``[(repo_path, bytes)]`` for the files the user asked to push."""
-    payloads: list = []
-    for fmt in ("srt", "vtt"):
-        if fmt not in wanted:
-            continue
-        text = subtitles.serialize(job.cues or [], fmt)
-        data = text.encode("utf-8-sig" if use_bom else "utf-8")
-        name = f"{job.stem}.{fmt}"
-        payloads.append((f"{prefix}/{name}" if prefix else name, data))
-
-    if "video" in wanted:
-        video_path = job.files.get("video")
-        if not video_path or not Path(video_path).exists():
-            raise HTTPException(status_code=404, detail="Burned video not available")
-        try:
-            size = Path(video_path).stat().st_size
-        except OSError:
-            raise HTTPException(status_code=404, detail="Burned video not available")
-        if size > github_push.MAX_FILE_BYTES:
-            raise HTTPException(
-                status_code=413,
-                detail=(
-                    f"Video is {size / (1024 * 1024):.0f} MB — GitHub allows "
-                    "at most 100 MB per file"
-                ),
-            )
-        name = f"{job.stem}.subtitled.mp4"
-        payloads.append((f"{prefix}/{name}" if prefix else name, Path(video_path).read_bytes()))
-    return payloads
-
-
-@app.post("/api/github/push")
-def github_push_job(body: GitHubPushRequest) -> dict:
-    """Commit the job's results to a GitHub repository as a single commit."""
-    job = _require_job(body.job_id)
-    if job.cues is None:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Subtitles not ready (stage: {job.stage.value})",
-        )
-
-    token = body.token or os.environ.get("GITHUB_TOKEN", "").strip()
-    if not token:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "No GitHub token — paste a Personal Access Token (Contents: "
-                "Read and write) or start the server with GITHUB_TOKEN set"
-            ),
-        )
-
-    use_bom = job.options.add_bom if body.bom is None else bool(body.bom)
-    payloads = _push_payloads(job, body.files, body.folder, use_bom)
-    if not payloads:
-        raise HTTPException(status_code=422, detail="No files selected to push")
-
-    message = body.message.strip() or (
-        f"Add Arabic subtitles for {job.original_filename} (Video2ArabicSubs)"
-    )
-    try:
-        result = github_push.push_files(
-            token, body.repo, body.branch, message, payloads
-        )
-    except github_push.GitHubError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    job.add_log(
-        f"⬆ Pushed {len(payloads)} file(s) to {body.repo}@{body.branch} — "
-        f"commit {str(result.get('commit_sha', ''))[:7]}"
-    )
-    return {"ok": True, **result}
 
 
 if __name__ == "__main__":  # convenience: python -m web.main
