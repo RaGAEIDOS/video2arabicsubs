@@ -589,9 +589,9 @@ def main() -> None:
         check(progresses and max(progresses) == 100.0, "progress reaches 100%")
 
         # Bilingual rendering now lives in i18n (the GUI paints it).
-        check("استخراج الصوت" in tr("ar", "stage.extracting"),
+        check("استخراج" in tr("ar", "stage.extracting"),
               "Arabic status message preserved")
-        check("تحويل الكلام إلى نص" in tr("ar", "stage.transcribing"),
+        check("تفريغ" in tr("ar", "stage.transcribing"),
               "transcribe status message preserved")
         check("✅" in tr("ar", "job.done"), "completion message preserved")
         check(tr("en", "stage.transcribing") != tr("ar", "stage.transcribing"),

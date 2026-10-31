@@ -26,6 +26,7 @@ from pathlib import Path
 from app import __app_name__, __version__
 from app import i18n, theme
 from app.processor import Processor, default_options
+from app.reshape import shaped
 from app.widgets import (
     AnimatedProgress,
     Badge,
@@ -465,6 +466,7 @@ class App:
             self._style_chip(chip, "pending")
 
     def _style_chip(self, chip, state):
+        chip["state"] = state  # remembered so a language switch can re-paint it
         if state == "active":
             bg, border, fg, dot = theme.ACCENT_DEEP, theme.ACCENT, "#ffffff", theme.ACCENT_HI
         elif state == "done":
@@ -477,7 +479,7 @@ class App:
             chip["frame"].configure(bg=bg, highlightbackground=border)
             chip["dot"].configure(bg=bg)
             chip["dot"].itemconfigure(chip["dot_id"], fill=dot)
-            chip["label"].configure(text=i18n.tr(self.lang, f"stage.{chip['key']}"),
+            chip["label"].configure(text=shaped(i18n.tr(self.lang, f"stage.{chip['key']}")),
                                     bg=bg, fg=fg)
         except tk.TclError:
             pass
@@ -517,37 +519,56 @@ class App:
         self._apply_language()
         self._pack_columns()
         self._render_rows()
-        # refresh stepper text for current state
-        self._update_stepper(getattr(self, "_last_stage", "queued"))
+        # Re-paint the stepper chips in the new language while keeping each
+        # chip's current state (the state lives on the chip itself — deriving
+        # it from _last_stage fails before the first progress event).
+        for chip in getattr(self, "_step_chips", {}).values():
+            self._style_chip(chip, chip.get("state", "pending"))
+        # …and the live status line, from its logical key + kwargs.
+        if getattr(self, "_status_key", None):
+            self._set_status(self._status_key, **getattr(self, "_status_kw", {}))
 
     def _t(self, key, **kw):
         return i18n.tr(self.lang, key, **kw)
 
+    def _set_status(self, key, **kw):
+        """Update the live status label from an i18n key (logical → shaped).
+
+        The key/kwargs are remembered so switching languages re-renders the
+        line in the new language instead of leaving the old text behind.
+        """
+        self._status_key, self._status_kw = key, kw
+        self.lbl_current.configure(text=shaped(self._t(key, **kw)))
+
     def _apply_language(self):
+        # NOTE: `tr` here feeds *raw* tk labels, so each result goes through
+        # shaped(). The widget setters (Card.set_title / ModernButton.set_text /
+        # SegmentedControl.set_labels) already shape internally — never shape
+        # their arguments too (shaping is single-pass, not idempotent).
         tr = self._t
         self.root.title(f"{__app_name__} v{__version__}")
         self.lbl_title.configure(text=__app_name__)
-        self.lbl_tag.configure(text=tr("app.tagline"))
+        self.lbl_tag.configure(text=shaped(tr("app.tagline")))
 
         # source card
         self.card_source.set_title(tr("source.title"), "🎬")
         self.btn_files.set_text(tr("source.files"))
         self.btn_folder.set_text(tr("source.folder"))
-        self.lbl_recursive.configure(text=tr("source.recursive"))
-        self.lbl_log_title.configure(text=tr("job.log"))
-        self.btn_log_clear.configure(text=tr("job.log_clear"))
+        self.lbl_recursive.configure(text=shaped(tr("source.recursive")))
+        self.lbl_log_title.configure(text=shaped(tr("job.log")))
+        self.btn_log_clear.configure(text=shaped(tr("job.log_clear")))
 
         # options card
         self.card_options.set_title(tr("opt.title"), "⚙️")
-        self.lbl_engine.configure(text=tr("opt.engine"))
+        self.lbl_engine.configure(text=shaped(tr("opt.engine")))
         self.seg_engine.set_labels([tr("opt.engine_local"), tr("opt.engine_google"),
                                     tr("opt.engine_none")])
-        self.lbl_format.configure(text=tr("opt.format"))
+        self.lbl_format.configure(text=shaped(tr("opt.format")))
         self.seg_format.set_labels([tr("opt.fmt_srt"), tr("opt.fmt_vtt"), tr("opt.fmt_both")])
-        self.lbl_where.configure(text=tr("opt.where"))
+        self.lbl_where.configure(text=shaped(tr("opt.where")))
         self.seg_where.set_labels([tr("opt.next_to_video"), tr("opt.custom_folder")])
         self.btn_browse.set_text(tr("opt.custom_folder_btn"))
-        self.lbl_extras.configure(text=tr("opt.toggles"))
+        self.lbl_extras.configure(text=shaped(tr("opt.toggles")))
 
         # job card
         self.card_job.set_title(tr("job.title"), "⏳")
@@ -560,13 +581,13 @@ class App:
     def _refresh_translatable(self):
         for lbl, key, kw in getattr(self, "_translatable", []):
             try:
-                lbl.configure(text=self._t(key, **kw))
+                lbl.configure(text=shaped(self._t(key, **kw)))
             except tk.TclError:
                 pass
 
     def _update_model_hint(self):
         hints = _MODEL_HINTS.get(self.lang, _MODEL_HINTS["en"])
-        self.lbl_model_hint.configure(text=hints.get(self.var_model.get(), ""))
+        self.lbl_model_hint.configure(text=shaped(hints.get(self.var_model.get(), "")))
 
     def _on_engine(self, value):
         pass
@@ -577,8 +598,9 @@ class App:
         if self._burn.get("available", False):
             self._burn_hint_lbl.configure(text="")
         else:
-            self._burn_hint_lbl.configure(text=self._burn.get("reason", "") or
-                                          self._t("opt.burn_unavailable"))
+            self._burn_hint_lbl.configure(
+                text=shaped(self._burn.get("reason", "") or
+                            self._t("opt.burn_unavailable")))
 
     # ── file picking ───────────────────────────────────────
     def _pick_files(self):
@@ -634,7 +656,7 @@ class App:
             child.destroy()
 
         if not self.videos:
-            empty = tk.Label(self.rows_frame, text=self._t("source.empty"),
+            empty = tk.Label(self.rows_frame, text=shaped(self._t("source.empty")),
                              bg=theme.SURFACE, fg=theme.TEXT_FAINT,
                              font=theme.FONT_SMALL, justify="center")
             empty.pack(pady=30, padx=10, fill="x")
@@ -665,9 +687,9 @@ class App:
         name_col = tk.Frame(row, bg=row_bg)
         name_col.pack(side="left", fill="x", expand=True)
         name = os.path.basename(path)
-        tk.Label(name_col, text=name, bg=row_bg, fg=theme.TEXT, font=theme.FONT_SMALL,
+        tk.Label(name_col, text=shaped(name), bg=row_bg, fg=theme.TEXT, font=theme.FONT_SMALL,
                  anchor="w").pack(anchor="w")
-        tk.Label(name_col, text=os.path.dirname(path), bg=row_bg, fg=theme.TEXT_FAINT,
+        tk.Label(name_col, text=shaped(os.path.dirname(path)), bg=row_bg, fg=theme.TEXT_FAINT,
                  font=theme.FONT_TINY, anchor="w").pack(anchor="w")
         for child in name_col.winfo_children():
             child.bind("<Button-1>", lambda e, idx=i: self._select(idx))
@@ -683,7 +705,7 @@ class App:
         self._render_rows()
 
     def _update_count(self):
-        self.lbl_count.configure(text=self._t("source.count", n=len(self.videos)))
+        self.lbl_count.configure(text=shaped(self._t("source.count", n=len(self.videos))))
 
     def _move(self, delta):
         if self.selected is None:
@@ -706,6 +728,9 @@ class App:
 
     # ── logging / progress ─────────────────────────────────
     def _log(self, text, tag=None):
+        # Every log line is shaped here, exactly once, before it enters the
+        # Text widget (callers always pass logical text).
+        text = shaped(text)
         self.log.configure(state="normal")
         if tag:
             self.log.insert("end", text + "\n", tag)
@@ -736,7 +761,10 @@ class App:
     def _start(self):
         if not self.videos:
             from tkinter import messagebox
-            messagebox.showwarning(self._t("dlg.warn_title"), self._t("job.need_input"))
+            # the dialog *title* stays logical: the window manager (Pango)
+            # shapes it natively — only the Tk-rendered message needs shaping.
+            messagebox.showwarning(self._t("dlg.warn_title"),
+                                   shaped(self._t("job.need_input")))
             return
         self._log_clear_safe()
         self.progress.reset()
@@ -757,7 +785,7 @@ class App:
             return
         self.btn_start.configure_state("disabled")
         self.btn_stop.configure_state("normal")
-        self.lbl_current.configure(text=self._t("job.running"))
+        self._set_status("job.running")
 
     def _log_clear_safe(self):
         self._clear_log()
@@ -787,8 +815,7 @@ class App:
             elif t == "item":
                 self._on_item_event(ev)
             elif t == "batch_start":
-                self.lbl_current.configure(
-                    text=self._t("job.progress_of", i=0, n=ev.get("total", 0)))
+                self._set_status("job.progress_of", i=0, n=ev.get("total", 0))
             elif t == "batch_end":
                 self._on_batch_end(ev)
             elif t == "fatal":
@@ -813,8 +840,7 @@ class App:
             self.status[e.path] = st
             self._render_rows()
         if e.kind == "item_start":
-            self.lbl_current.configure(
-                text=self._t("job.current", name=e.name))
+            self._set_status("job.current", name=e.name)
             self._log(f"▶ [{e.index + 1}/{e.total}] {e.name}", "info")
         elif e.kind == "item_done":
             files = ", ".join(os.path.basename(p) for p in e.files.values())
@@ -829,12 +855,12 @@ class App:
         done, failed, cancelled = ev.get("done", []), ev.get("failed", []), ev.get("cancelled")
         if cancelled:
             self._log(self._t("job.cancelled"), "err")
-            self.lbl_current.configure(text=self._t("job.cancelled"))
+            self._set_status("job.cancelled")
         else:
             summary = self._t("job.done_sub", ok=len(done), total=ev.get("total", 0))
             self._log(self._t("job.done"), "ok")
             self._log(summary, "ok")
-            self.lbl_current.configure(text=summary)
+            self._set_status("job.done_sub", ok=len(done), total=ev.get("total", 0))
             self._update_stepper("done")
 
     def _last_percent(self):

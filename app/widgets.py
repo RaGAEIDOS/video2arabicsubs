@@ -22,6 +22,7 @@ import tkinter as tk
 from typing import Callable, List, Optional, Sequence
 
 from app import theme
+from app.reshape import shaped
 
 
 # ── helpers ───────────────────────────────────────────────────────────────
@@ -145,7 +146,11 @@ class Card(tk.Frame):
             self._run_enter()
 
     def _compose_title(self, title: str) -> str:
-        return f"{self._icon}  {title}".strip() if title else ""
+        # Single choke point for Card titles (constructor + set_title) —
+        # the StringVar feeds a tk.Label, so it needs display-ready text.
+        if not title:
+            return ""
+        return shaped(f"{self._icon}  {title}".strip())
 
     def set_title(self, title: str, icon: str = None) -> None:
         if icon is not None:
@@ -232,8 +237,8 @@ class ModernButton(tk.Frame):
         self.canvas = tk.Canvas(self, highlightthickness=0, bd=0,
                                 bg=_bg_of(parent), cursor="hand2")
         self.canvas.pack()
-        self._label = tk.Label(self.canvas, text=self._text, bg=theme.ACCENT,
-                               fg="#ffffff", font=theme.FONT_BODY)
+        self._label = tk.Label(self.canvas, text=shaped(self._text),
+                               bg=theme.ACCENT, fg="#ffffff", font=theme.FONT_BODY)
         self._win = self.canvas.create_window(0, 0, anchor="center", window=self._label)
 
         self._label.bind("<Enter>", self._on_enter)
@@ -327,7 +332,7 @@ class ModernButton(tk.Frame):
     def set_text(self, text: str) -> None:
         self._text = text
         try:
-            self._label.configure(text=text)
+            self._label.configure(text=shaped(text))
         except tk.TclError:
             pass
 
@@ -426,7 +431,7 @@ class SegmentedControl(tk.Frame):
         # issue the window-level "lower" directly).
         self._indicator.tk.call("lower", self._indicator._w)
         for i, (label, value) in enumerate(self._segments):
-            lbl = tk.Label(self, text=label, bg=theme.SURFACE, fg=theme.TEXT_DIM,
+            lbl = tk.Label(self, text=shaped(label), bg=theme.SURFACE, fg=theme.TEXT_DIM,
                            font=theme.FONT_SMALL, padx=12, pady=6, cursor="hand2")
             lbl.bind("<Button-1>", lambda _e, v=value: self.set(v))
             lbl.grid(row=0, column=i, sticky="nsew")
@@ -512,7 +517,7 @@ class SegmentedControl(tk.Frame):
         """Relabel the segments in place (used by the language toggle)."""
         for lbl, text in zip(self._labels, labels):
             try:
-                lbl.configure(text=text)
+                lbl.configure(text=shaped(text))
             except tk.TclError:
                 pass
 
@@ -613,7 +618,7 @@ class Badge(tk.Frame):
             "warn": ("#78350f", "#fde68a"),
             "danger": (theme.DANGER_DEEP, "#fecaca"),
         }
-        self._lbl = tk.Label(self, text=text, padx=8, pady=2,
+        self._lbl = tk.Label(self, text=shaped(text), padx=8, pady=2,
                              font=theme.FONT_TINY, **self._style(tone))
         self._lbl.pack()
 
@@ -623,6 +628,6 @@ class Badge(tk.Frame):
 
     def set(self, text: str, tone: str = "neutral") -> None:
         try:
-            self._lbl.configure(text=text, **self._style(tone))
+            self._lbl.configure(text=shaped(text), **self._style(tone))
         except tk.TclError:
             pass

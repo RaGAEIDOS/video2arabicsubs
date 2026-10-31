@@ -95,11 +95,14 @@ STRINGS: Dict[str, Dict[str, str]] = {
         # ── Pipeline stages ───────────────────────────────────────────
         "stage.queued": "في الانتظار",
         "stage.downloading": "تنزيل الفيديو",
-        "stage.extracting": "استخراج الصوت",
-        "stage.transcribing": "تحويل الكلام إلى نص",
-        "stage.translating": "الترجمة إلى العربية",
-        "stage.generating": "إنشاء ملف الترجمة",
-        "stage.burning": "حرق الترجمة في الفيديو",
+        # NOTE: stage.* labels are the stepper-chip captions — intentionally
+        # SHORT verbs so all five chips fit one row (~490px card) in both
+        # languages. The full descriptions live in the log/status messages.
+        "stage.extracting": "استخراج",
+        "stage.transcribing": "تفريغ",
+        "stage.translating": "ترجمة",
+        "stage.generating": "إنشاء",
+        "stage.burning": "حرق",
         "stage.done": "اكتمل",
         "stage.error": "فشل",
         "stage.cancelled": "أُلغيت",
@@ -182,11 +185,12 @@ STRINGS: Dict[str, Dict[str, str]] = {
 
         "stage.queued": "Queued",
         "stage.downloading": "Downloading video",
-        "stage.extracting": "Extracting audio",
-        "stage.transcribing": "Transcribing speech",
-        "stage.translating": "Translating to Arabic",
-        "stage.generating": "Generating subtitles",
-        "stage.burning": "Burning subtitles",
+        # short stepper-chip captions (see the Arabic block's NOTE)
+        "stage.extracting": "Extract",
+        "stage.transcribing": "Transcribe",
+        "stage.translating": "Translate",
+        "stage.generating": "Generate",
+        "stage.burning": "Burn",
         "stage.done": "Done",
         "stage.error": "Failed",
         "stage.cancelled": "Cancelled",

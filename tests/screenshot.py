@@ -60,7 +60,7 @@ def seed(app, stage, percent, log_lines, active_idx=2, done_upto=1):
     app._update_stepper(stage)
     app.progress.set(percent, active=True)
     app.lbl_percent.configure(text=f"{percent:.0f}%")
-    app.lbl_current.configure(text=app._t("job.current", name=Path(app.videos[active_idx]).name))
+    app._set_status("job.current", name=Path(app.videos[active_idx]).name)
     for line, tag in log_lines:
         app._log(line, tag)
 
