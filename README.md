@@ -69,7 +69,7 @@ pinned: false
 ### 🐧 التثبيت الرسمي عبر apt (مستودع gh-pages)
 
 ```bash
-echo "deb [trusted=yes] https://RaGAEIDOS.github.io/video2arabicsubs stable main" \
+echo "deb [trusted=yes] https://ragaeidos.website/video2arabicsubs/ stable main" \
   | sudo tee /etc/apt/sources.list.d/v2as.list
 
 sudo apt update
