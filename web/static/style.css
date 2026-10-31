@@ -22,6 +22,40 @@ body {
   padding: 1.25rem;
   box-shadow: 0 10px 30px -18px rgba(0, 0, 0, .9);
   backdrop-filter: blur(6px);
+  transition: transform .25s cubic-bezier(.2, .7, .3, 1), box-shadow .25s ease,
+              border-color .25s ease;
+  animation: card-in .4s cubic-bezier(.2, .7, .3, 1) both;
+}
+.card:hover {
+  border-color: rgba(99, 102, 241, .35);
+  box-shadow: 0 18px 44px -20px rgba(79, 70, 229, .5);
+}
+
+/* Staggered entrance for the main grid cards */
+#setupGrid > div > .card:nth-child(1) { animation-delay: .05s; }
+#setupGrid > div > .card:nth-child(2) { animation-delay: .12s; }
+#setupGrid > div > .space-y-5 > .card:nth-child(1) { animation-delay: .18s; }
+#setupGrid > div > .space-y-5 > .card:nth-child(2) { animation-delay: .24s; }
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(14px) scale(.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Live status pulse on the job card border while running */
+#jobCard.running { border-color: rgba(45, 212, 191, .4); animation: none; }
+#jobCard.running::before {
+  content: "";
+  position: absolute; inset: -1px;
+  border-radius: 1rem; pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(45, 212, 191, .5);
+  animation: halo 2s ease-out infinite;
+}
+#jobCard { position: relative; }
+@keyframes halo {
+  0%   { box-shadow: 0 0 0 0 rgba(45, 212, 191, .45); }
+  70%  { box-shadow: 0 0 0 12px rgba(45, 212, 191, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0); }
 }
 
 .card-title {

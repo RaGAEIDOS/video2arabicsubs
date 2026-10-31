@@ -24,6 +24,9 @@ const I18N = {
     'opt.engineNone': 'الإنجليزية (بدون ترجمة)',
     'opt.format': 'صيغة الملف',
     'opt.fmtBoth': 'SRT + VTT',
+    'opt.credit': 'إضافة سطر الترويج في نهاية الترجمة',
+    'opt.creditBadge': 'ترويج',
+    'opt.creditHint': '«تم الترجمة بواسطة …» — يظهر كآخر سطر ظاهر ثواني في نهاية الفيديو.',
     'opt.outDir': '📁 مجلد حفظ الناتج (اختياري)',
     'opt.outDirPh': '/home/meuor/Videos/subtitles',
     'opt.outDirHint': 'تُنسخ ملفات الترجمة (والفيديو المُحروق) إلى هذا المجلد على الخادم فور انتهاء المعالجة.',
@@ -93,6 +96,9 @@ const I18N = {
     'opt.engineNone': 'English (no translation)',
     'opt.format': 'Output format',
     'opt.fmtBoth': 'SRT + VTT',
+    'opt.credit': 'Append the promo credit at the end',
+    'opt.creditBadge': 'Promo',
+    'opt.creditHint': '“Translated by …” — shows as a final visible cue for a few seconds.',
     'opt.outDir': '📁 Save-to folder (optional)',
     'opt.outDirPh': '/home/meuor/Videos/subtitles',
     'opt.outDirHint': 'Subtitle files (and the burned video) are copied to this folder on the server as soon as processing finishes.',
@@ -424,6 +430,7 @@ function collectOptions() {
     output_format: $('optFormat').value,
     burn_video: $('optBurn').checked,
     add_bom: $('optBom').checked,
+    add_credit: $('optCredit') ? $('optCredit').checked : true,
     output_dir: $('optOutDir').value.trim(),
   };
 }
@@ -629,6 +636,7 @@ function renderJob() {
     setProgress(job.percent || 0, job.stage, job.stage_percent, terminal);
   }
   $('cancelBtn').classList.toggle('hidden', terminal || job.stage === 'uploading');
+  $('jobCard').classList.toggle('running', !terminal && job.stage !== 'queued');
   updateStartHint();
 }
 

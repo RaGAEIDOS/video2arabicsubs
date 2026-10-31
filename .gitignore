@@ -23,6 +23,7 @@ build/
 
 # Generated subtitle files
 *.srt
+*.vtt
 
 # Web app runtime data (uploads, temp audio, job outputs)
 web/data/

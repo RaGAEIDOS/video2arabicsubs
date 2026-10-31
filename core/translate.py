@@ -1,9 +1,11 @@
 """Translation to Arabic with pluggable engines.
 
-Engines:
+Engines (in the order the UI offers them):
 
-* ``google`` — Google Translate via ``deep-translator`` (default, online),
-* ``argos``  — **offline** translation via Argos Translate (no internet),
+* ``argos``  — **offline** translation via Argos Translate (**default**, no
+  internet, ~100 MB language package downloaded once),
+* ``google`` — Google Translate via ``deep-translator`` (online, explicit
+  opt-in for users who want it),
 * ``none``   — passthrough (video is already Arabic / user wants no translation).
 
 When Google is rate-limited (429) and its backoff budget is exhausted, the
@@ -36,7 +38,9 @@ from typing import Callable, Dict, List, Mapping, Optional, Sequence
 
 from core.models import PipelineCancelled
 
-DEFAULT_ENGINE = "google"
+#: Local-first default: the offline engine is what the app uses unless the
+#: user explicitly opts into Google.
+DEFAULT_ENGINE = "argos"
 TARGET_LANGUAGE = "ar"
 
 #: Keep each Google request comfortably below the API's ~5k char limit.

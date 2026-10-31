@@ -1,0 +1,5 @@
+# Build-time dependencies only (PyInstaller / NSIS pipeline).
+# Runtime dependencies live in requirements.txt — the Linux first-run
+# launcher installs just that file into the per-user venv.
+-r requirements.txt
+pyinstaller>=5.0

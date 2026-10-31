@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
 from core import audio as audio_mod
+from core import credit as credit_mod
 from core import subtitles
 from core import transcribe as transcribe_mod
 from core import translate as translate_mod
@@ -416,6 +417,11 @@ def run_pipeline(
 ) -> PipelineResult:
     """Run the full video → Arabic subtitles pipeline.
 
+    ``output_dir`` may be ``None``/empty, in which case the subtitle files
+    are written **into the same folder as the video** (the default the
+    users asked for). An explicit folder (web save-folder, desktop custom
+    folder) always wins.
+
     ``progress_offset`` / ``progress_scale`` map the pipeline's internal
     0–100 % into an outer range (used for multi-file desktop batches and
     the web job's URL-download phase).
@@ -427,6 +433,10 @@ def run_pipeline(
     reused as-is.
     """
     options = options or JobOptions()
+    # M2 macro: "next to the video" is the default target — an explicit
+    # output_dir (web save folder / desktop custom folder) still wins.
+    if not output_dir:
+        output_dir = os.path.dirname(os.path.abspath(media_path)) or "."
     os.makedirs(output_dir, exist_ok=True)
     stem = base_name or os.path.splitext(os.path.basename(media_path))[0]
     weights = _WEIGHTS_WITH_BURN if options.burn_video else _WEIGHTS_WITHOUT_BURN
@@ -531,6 +541,9 @@ def run_pipeline(
         emitter.start(Stage.GENERATING, "Generating subtitle files…")
         try:
             cues = subtitles.cues_from_segments(segments, translated)
+            # M1 macro: promotional credit as the final *visible* cue.
+            if options.add_credit:
+                cues = credit_mod.apply_credit(cues, duration, enabled=True)
             for fmt in options.wanted_formats():
                 out_path = os.path.join(output_dir, f"{stem}.{fmt}")
                 subtitles.write_file(cues, out_path, fmt=fmt, bom=options.add_bom)

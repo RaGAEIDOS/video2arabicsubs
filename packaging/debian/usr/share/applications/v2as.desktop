@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Video2ArabicSubs
+Name[ar]=فيديو إلى ترجمة عربية
+GenericName=Arabic subtitle generator
+GenericName[ar]=مولّد ترجمة عربية
+Comment=Turn any video into Arabic subtitles (SRT / VTT)
+Comment[ar]=حوّل أي فيديو إلى ترجمة عربية (SRT / VTT)
+Exec=/usr/bin/v2as
+Icon=v2as
+Terminal=false
+StartupNotify=true
+StartupWMClass=videotarabicsubs
+Categories=AudioVideo;Video;AudioVideoEditing;GTK;
+Keywords=subtitle;whisper;arabic;translate;translation;srt;vtt;caption;
+Keywords[ar]=ترجمة;عربي;whisper;subtitle;srt;vtt;فيديو;

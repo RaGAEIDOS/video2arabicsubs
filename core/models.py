@@ -92,7 +92,11 @@ class ProgressEvent:
 
 # ── Job options ───────────────────────────────────────────────────────────
 MODEL_SIZES = ("tiny", "base", "small", "medium", "large", "turbo")
-ENGINES = ("google", "argos", "none")
+
+#: Translation engines — **local (argos) first**: offline models are the
+#: default; Google is an explicit opt-in for users who want it.
+ENGINES = ("argos", "google", "none")
+DEFAULT_ENGINE = "argos"
 OUTPUT_FORMATS = ("srt", "vtt", "both")
 
 #: Curated subset of Whisper languages (ISO-639-1) for the UI dropdown.
@@ -125,14 +129,26 @@ _LANG_CODE_RE = re.compile(r"^[a-z]{2,3}(-[a-z]+)?$")
 
 @dataclass
 class JobOptions:
-    """Processing options for one video (shared by desktop and web)."""
+    """Processing options for one video (shared by desktop and web).
+
+    v0.4 additions (each toggle is its own macro, defaulting to the most
+    useful behaviour):
+
+    * ``save_next_to_video`` — write the subtitle file **into the same
+      folder as the video** (the user's core request),
+    * ``add_credit`` — append the promotional credit cue at the end,
+    * ``engine`` now defaults to the **local** ``argos`` translator;
+      Google stays available as an explicit opt-in.
+    """
 
     model_size: str = "small"
     source_language: str = "auto"      # "auto" or ISO-639-1 code
-    engine: str = "google"             # "google" (falls back offline) | "argos" | "none"
+    engine: str = DEFAULT_ENGINE       # "argos" (local, default) | "google" | "none"
     output_format: str = "both"        # "srt" | "vtt" | "both"
     burn_video: bool = False           # burn subtitles into a copy of the video
     add_bom: bool = False              # write files as UTF-8 with BOM
+    add_credit: bool = True            # append «تم الترجمة بواسطة …» cue at the end
+    save_next_to_video: bool = True    # write subtitles next to the video file
     target_language: str = "ar"
 
     def __post_init__(self) -> None:
@@ -164,5 +180,7 @@ class JobOptions:
             "output_format": self.output_format,
             "burn_video": self.burn_video,
             "add_bom": self.add_bom,
+            "add_credit": self.add_credit,
+            "save_next_to_video": self.save_next_to_video,
             "target_language": self.target_language,
         }

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Debian wrapper: the real launcher lives inside /opt/v2as (it resolves the
+# app path from its own location, so the portable .run can share it).
+exec /opt/v2as/v2as "$@"

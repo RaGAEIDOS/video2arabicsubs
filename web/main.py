@@ -38,7 +38,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from core import subtitles
-from core.models import Cue, JobOptions, Stage, LANGUAGES, MODEL_SIZES, ENGINES, OUTPUT_FORMATS
+from core import credit as credit_mod
+from core.models import Cue, JobOptions, Stage, LANGUAGES, MODEL_SIZES, ENGINES, OUTPUT_FORMATS, DEFAULT_ENGINE
 from core.pipeline import burn_status
 from web import jobs as jobs_module
 from web.jobs import dumps, manager, url_support
@@ -84,6 +85,22 @@ def _require_job(job_id: str) -> "jobs_module.Job":
     return job
 
 
+def _form_bool(value, default: bool = False) -> bool:
+    """Parse an optional form flag, honouring ``default`` when the field is
+    absent.
+
+    FastAPI/Starlette turns a *missing* ``bool`` form field into ``False``,
+    which would silently disable the promo credit for clients that simply
+    omit it — so that one is sent as ``Optional[str] = Form(None)`` and this
+    helper applies the intended ON-by-default semantics.
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("1", "true", "yes", "on", "y")
+
+
 def _build_options(
     model_size: str,
     source_language: str,
@@ -91,6 +108,7 @@ def _build_options(
     output_format: str,
     burn_video: bool,
     add_bom: bool,
+    add_credit: bool = True,
 ) -> JobOptions:
     try:
         return JobOptions(
@@ -98,8 +116,9 @@ def _build_options(
             source_language=source_language,
             engine=engine,
             output_format=output_format,
-            burn_video=bool(burn_video),
-            add_bom=bool(add_bom),
+            burn_video=_form_bool(burn_video, False),
+            add_bom=_form_bool(add_bom, False),
+            add_credit=_form_bool(add_credit, True),
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -148,11 +167,13 @@ def health() -> dict:
         "max_upload_mb": MAX_UPLOAD_MB,
         "url_support": url_support(),
         "burn": burn_status(),
+        "credit": {"text": credit_mod.CREDIT_TEXT},
         "defaults": {
             "model_size": "small",
             "source_language": "auto",
-            "engine": "google",
+            "engine": DEFAULT_ENGINE,
             "output_format": "both",
+            "add_credit": True,
         },
     }
 
@@ -182,10 +203,11 @@ async def upload(
     file: UploadFile = File(...),
     model_size: str = Form("small"),
     source_language: str = Form("auto"),
-    engine: str = Form("google"),
+    engine: str = Form(DEFAULT_ENGINE),
     output_format: str = Form("both"),
     burn_video: bool = Form(False),
     add_bom: bool = Form(False),
+    add_credit: Optional[str] = Form(None),
     output_dir: str = Form(""),
 ) -> dict:
     content_length = request.headers.get("content-length")
@@ -208,7 +230,8 @@ async def upload(
         )
 
     options = _build_options(
-        model_size, source_language, engine, output_format, burn_video, add_bom
+        model_size, source_language, engine, output_format, burn_video, add_bom,
+        add_credit,
     )
     job = manager.create(
         options=options,
@@ -249,10 +272,11 @@ async def upload_url(
     url: str = Form(...),
     model_size: str = Form("small"),
     source_language: str = Form("auto"),
-    engine: str = Form("google"),
+    engine: str = Form(DEFAULT_ENGINE),
     output_format: str = Form("both"),
     burn_video: bool = Form(False),
     add_bom: bool = Form(False),
+    add_credit: Optional[str] = Form(None),
     output_dir: str = Form(""),
 ) -> dict:
     url = url.strip()
@@ -264,7 +288,8 @@ async def upload_url(
             detail="URL ingestion requires yt-dlp — install it with: pip install yt-dlp",
         )
     options = _build_options(
-        model_size, source_language, engine, output_format, burn_video, add_bom
+        model_size, source_language, engine, output_format, burn_video, add_bom,
+        add_credit,
     )
     job = manager.create(
         options=options,

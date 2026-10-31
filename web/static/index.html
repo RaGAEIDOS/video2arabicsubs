@@ -109,8 +109,8 @@
             <label class="field">
               <span class="field-label" data-i18n="opt.engine">لغة الترجمة</span>
               <select id="optEngine" class="input">
+                <option value="argos" data-i18n="opt.engineLocal">العربية (بدون إنترنت — محلي)</option>
                 <option value="google" data-i18n="opt.engineGoogle">العربية (ترجمة جوجل)</option>
-                <option value="argos" data-i18n="opt.engineLocal">العربية (بدون إنترنت)</option>
                 <option value="none" data-i18n="opt.engineNone">الإنجليزية (بدون ترجمة)</option>
               </select>
             </label>
@@ -133,6 +133,14 @@
           </div>
 
           <div class="mt-4 space-y-2.5">
+            <label class="check-row" id="creditRow">
+              <input type="checkbox" id="optCredit" class="check" checked />
+              <span data-i18n="opt.credit">إضافة سطر الترويج في نهاية الترجمة</span>
+              <span class="badge badge-accent" data-i18n="opt.creditBadge">ترويج</span>
+            </label>
+            <p id="creditHint" class="ps-6 text-[11px] text-slate-500"
+               data-i18n="opt.creditHint">«تم الترجمة بواسطة …» — يظهر كآخر سطر ظاهر ثواني في نهاية الفيديو.</p>
+
             <label class="check-row" id="burnRow">
               <input type="checkbox" id="optBurn" class="check" />
               <span data-i18n="opt.burn">حرق الترجمة داخل نسخة من الفيديو</span>

@@ -138,8 +138,14 @@ def main() -> None:
     sleeps: list = []
 
     def translate_with(gt, texts, **kw):
-        """Run the real translate_batch against a fake Google + fast clocks."""
+        """Run the real translate_batch against a fake Google + fast clocks.
+
+        These tests exercise the *Google* engine's robustness (batching,
+        retry, rate-limit, resume), so they pin ``engine="google"`` — the
+        app-wide default is the local engine (see tests/features_test.py).
+        """
         sleeps.clear()
+        kw.setdefault("engine", "google")
         with mock.patch("core.translate._get_translator", return_value=gt), \
              mock.patch("core.translate.offline_available", return_value=False), \
              mock.patch("core.translate._throttle", side_effect=lambda *a, **k: None), \
@@ -325,9 +331,12 @@ def main() -> None:
 
         print("== Subtitles API ==")
         subs = client.get(f"/api/subtitles/{job_id}").json()
-        check(len(subs["cues"]) == 3, "3 cues (empty segment skipped)")
+        # 3 translated cues + 1 promotional credit cue (v0.4) = 4
+        check(len(subs["cues"]) == 4, "4 cues (3 real + credit, empty segment skipped)")
         check(subs["cues"][0]["text"].startswith("مرحباً"), "Arabic translation present")
-        check(abs(subs["cues"][2]["end"] - 8.8) < 1e-6, "last cue timing kept")
+        check(abs(subs["cues"][2]["end"] - 8.8) < 1e-6, "last real cue timing kept")
+        check("github.com/RaGAEIDOS/video2arabicsubs" in subs["cues"][-1]["text"],
+              "promotional credit cue appended at the end")
 
         print("== Downloads (UTF-8) ==")
         srt = client.get(f"/api/download/{job_id}", params={"format": "srt"})
@@ -534,38 +543,68 @@ def main() -> None:
               "retry without source media → 410")
         client.delete(f"/api/job/{job2}")
 
-    print("== Desktop shim (Tkinter processor) ==")
-    from app.processor import Processor
+    print("== Desktop shim (queue-based processor) ==")
+    from app.processor import Processor, default_options
+    from app.i18n import tr
 
-    statuses, items, progresses = [], [], []
+    progresses, stages, item_kinds, ends = [], [], [], []
     fake_video = ROOT / "tests" / "_fake_video.mp4"
     fake_video.parent.mkdir(exist_ok=True)
     fake_video.write_bytes(payload)
+    proc = Processor()
     try:
         with stubbed_pipeline():
-            proc = Processor()
-            proc.process(
-                video_paths=[str(fake_video)],
-                output_dir=str(ROOT / "tests" / "_out"),
-                model_size="small",
-                progress_callback=progresses.append,
-                status_callback=statuses.append,
-                item_callback=lambda p, s: items.append(s),
+            started = proc.start(
+                [str(fake_video)],
+                default_options(engine="google"),
+                order="given",
             )
+            check(started, "start() accepted (queue API)")
+            check(proc.is_running, "worker runs on a background thread")
+
+            deadline = time.time() + 30
+            while time.time() < deadline and not ends:
+                for ev in proc.drain():
+                    kind = ev.get("type")
+                    if kind == "progress":
+                        progresses.append(ev["percent"])
+                        stages.append(getattr(ev["stage"], "value", ev["stage"]))
+                    elif kind == "item":
+                        item_kinds.append(ev["event"].kind)
+                    elif kind == "batch_end":
+                        ends.append(ev)
+                    elif kind == "fatal":
+                        raise AssertionError(ev.get("error"))
+                time.sleep(0.03)
+            check(ends, "batch_end event delivered through the queue")
+
+        # No cross-thread widget work: the processor only queues structured
+        # events, and the GUI renders stage names in the *active language*.
+        check("extracting" in stages and "translating" in stages,
+              "stage enums stream through the queue")
+        check(item_kinds == ["item_start", "item_done"],
+              "item events report start → done")
+        check(ends and str(fake_video) in ends[0]["done"] and not ends[0]["failed"],
+              "batch_end reports the file as done")
+        check(progresses and max(progresses) == 100.0, "progress reaches 100%")
+
+        # Bilingual rendering now lives in i18n (the GUI paints it).
+        check("استخراج الصوت" in tr("ar", "stage.extracting"),
+              "Arabic status message preserved")
+        check("تحويل الكلام إلى نص" in tr("ar", "stage.transcribing"),
+              "transcribe status message preserved")
+        check("✅" in tr("ar", "job.done"), "completion message preserved")
+        check(tr("en", "stage.transcribing") != tr("ar", "stage.transcribing"),
+              "English mirror differs from Arabic")
     finally:
         fake_video.unlink(missing_ok=True)
+        for leftover in (ROOT / "tests").glob("_fake_video.*"):
+            leftover.unlink()
         out_dir = ROOT / "tests" / "_out"
         if out_dir.exists():
             for leftover in out_dir.glob("*"):
                 leftover.unlink()
             out_dir.rmdir()
-
-    log = "\n".join(statuses)
-    check("استخراج الصوت" in log, "desktop status messages preserved (Arabic)")
-    check("تحويل الكلام إلى نص" in log, "transcribe status message preserved")
-    check("✓" in log and "✅ اكتملت الترجمة!" in log, "completion message preserved")
-    check(items == ["done"], "item callback reports done")
-    check(progresses and progresses[-1] == 100.0, "progress reaches 100%")
 
     print("\nALL SMOKE TESTS PASSED ✔")
 

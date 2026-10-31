@@ -1,13 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
-import sys
-from pathlib import Path
+# PyInstaller spec — Video2ArabicSubs desktop app (Windows).
+#
+#   pip install -r requirements-build.txt
+#   pyinstaller --clean video2arabicsubs.spec
+#
+# Built as ONEDIR (dist/Video2ArabicSubs/…): the app bundles torch/whisper,
+# so a onefile build would unpack gigabytes on every start. The NSIS
+# installer (installer.nsi) packages that folder.
 
 block_cipher = None
 
 datas = [
     ("img", "img"),
-    ("screenshots", "screenshots"),
-    ("README.md", "."),
+    ("requirements.txt", "."),
 ]
 
 a = Analysis(
@@ -16,6 +21,7 @@ a = Analysis(
     binaries=[],
     datas=datas,
     hiddenimports=[
+        # runtime deps
         "whisper",
         "deep_translator",
         "moviepy",
@@ -24,22 +30,38 @@ a = Analysis(
         "pystray",
         "PIL",
         "PIL._tkinter_finder",
+        "argostranslate",
+        # application (modular, one macro per file)
         "app",
         "app.gui",
         "app.processor",
-        "app.audio_extractor",
-        "app.transcriber",
-        "app.translator",
-        "app.subtitle_writer",
-        "app.dependency_checker",
+        "app.widgets",
+        "app.theme",
+        "app.i18n",
+        "core",
+        "core.pipeline",
+        "core.batch",
+        "core.credit",
+        "core.models",
+        "core.subtitles",
+        "core.audio",
+        "core.transcribe",
+        "core.translate",
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
+    excludes=[
+        # web UI is not part of the desktop executable (v2as --web tells the
+        # user to use the source/apt install instead)
+        "uvicorn",
+        "fastapi",
+        "starlette",
+        "web",
+        "multipart",
+        # build tooling
+        "pytest",
+    ],
     noarchive=False,
 )
 
@@ -48,17 +70,13 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="Video2ArabicSubs",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -66,4 +84,14 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon="img/first-logo-design.png",
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name="Video2ArabicSubs",
 )
