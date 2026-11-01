@@ -31,3 +31,4 @@ web/data/
 # Test artifacts
 tests/_out/
 tests/_outdir_tmp/
+img/app.ico

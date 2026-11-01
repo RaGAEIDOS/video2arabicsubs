@@ -10,15 +10,17 @@
 !define APP_URL "https://github.com/RaGAEIDOS/video2arabicsubs"
 
 Name "${APP_NAME} ${APP_VERSION}"
-OutFile "${APP_NAME}-Setup-${APP_VERSION}.exe"
+OutFile "dist\${APP_NAME}-Setup-${APP_VERSION}.exe"
 InstallDir "$PROGRAMFILES64\${APP_NAME}"
 InstallDirRegKey HKLM "Software\${APP_NAME}" "InstallDir"
 RequestExecutionLevel admin
 
-; Optional icon (generated from the logo by the release workflow).
-!ifexist "img\app.ico"
-  Icon "img\app.ico"
-  UninstallIcon "img\app.ico"
+; Optional icon — the release workflow generates img\app.ico from the logo
+; and passes it in as /DAPP_ICON=img\app.ico (NSIS has no !ifexist directive;
+; without the define we simply keep the default NSIS icon).
+!ifdef APP_ICON
+  Icon "${APP_ICON}"
+  UninstallIcon "${APP_ICON}"
 !endif
 
 Page directory

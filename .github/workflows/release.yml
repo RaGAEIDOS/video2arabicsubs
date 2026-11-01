@@ -148,7 +148,12 @@ jobs:
             }
           }
           if (-not $makensis) { throw "makensis not found — the NSIS install step failed" }
-          & $makensis installer.nsi
+          # Pass the generated icon when it exists (NSIS has no !ifexist — the
+          # script guards it with !ifdef APP_ICON and keeps the default icon
+          # when the define is absent).
+          $nsisArgs = @()
+          if (Test-Path img\app.ico) { $nsisArgs += "/DAPP_ICON=img\app.ico" }
+          & $makensis @nsisArgs installer.nsi
 
       - uses: actions/upload-artifact@v4
         with:
