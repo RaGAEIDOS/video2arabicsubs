@@ -131,7 +131,24 @@ jobs:
           }
 
       - name: Build installer (NSIS)
-        run: makensis installer.nsi
+        shell: pwsh
+        run: |
+          # choco installs NSIS machine-wide, but the runner's environment
+          # (and each step's shell) was fixed at startup — refresh PATH so
+          # makensis resolves, with a full-path fallback just in case.
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+                      [System.Environment]::GetEnvironmentVariable("Path","User")
+          $makensis = $null
+          $cmd = Get-Command makensis -ErrorAction SilentlyContinue
+          if ($cmd) { $makensis = $cmd.Source }
+          if (-not $makensis) {
+            foreach ($p in @("${env:ProgramFiles(x86)}\NSIS\makensis.exe",
+                             "$env:ProgramFiles\NSIS\makensis.exe")) {
+              if (Test-Path $p) { $makensis = $p; break }
+            }
+          }
+          if (-not $makensis) { throw "makensis not found — the NSIS install step failed" }
+          & $makensis installer.nsi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -187,14 +204,44 @@ jobs:
           files: release-assets/*
           generate_release_notes: true
           body: |
-            ## ⬇️ Quick install
+            ## 🎬 Video2ArabicSubs v0.4
 
-            | Platform | Package | Install |
+            تحويل أي فيديو إلى **ترجمة عربية (SRT/VTT)** — محلياً وبدون إنترنت افتراضياً، بواجهة عصرية ثنائية اللغة (عربي / English) **لا تعلّق أبداً**.
+
+            <p align="center">
+              <img src="https://raw.githubusercontent.com/RaGAEIDOS/video2arabicsubs/main/screenshots/desktop-ar.png" width="420"/>
+              &nbsp;&nbsp;
+              <img src="https://raw.githubusercontent.com/RaGAEIDOS/video2arabicsubs/main/screenshots/desktop-en.png" width="420"/>
+            </p>
+
+            ### ✨ أبرز ما الجديد
+
+            - 🎨 **واجهة سطح مكتب عصرية بالكامل** — بطاقات دائرية الحواف، شريط مراحل، أنيميشن ناعم، ثنائية اللغة مع انعكاس فوري RTL/LTR — والمعالجة كلها في خيط خلفي ف**لا تتجمّد الواجهة أبداً**.
+            - 🔤 **حروف عربية متصلة** على لينكس (تشكيل مسبق يعالج نقص HarfBuzz في Tk 8.6) — ويندوز وماك يعرضان بشكلها الأصلي.
+            - 🧠 **الترجمة أولاً بدون إنترنت** — محرك `argos` المحلي افتراضياً، وترجمة جوجل خيار صريح مع سقوط تلقائي عند القيود.
+            - 📁 **حفظ الترجمة بجانب الفيديو** مباشرة (أو مجلد مخصص) + **ترجمة مجلد كامل بالترتيب الطبيعي** (`ep2` قبل `ep10`) مع إعادة ترتيب ▲▼.
+            - 🎞️ **صيغة تختارها**: `SRT` / `VTT` / الاثنين · **حرق اختياري** للترجمة داخل الفيديو · **سطر ترويج** قابل للإيقاف في النهاية.
+            - 📦 **حزم جاهزة لكل المنصات** + **مستودع apt رسمي**: `sudo apt install v2as`.
+
+            ### ⬇️ التثبيت
+
+            | المنصة | الحزمة | الأمر |
             |---|---|---|
-            | Debian/Ubuntu (apt) | repo on `gh-pages` | `sudo apt install v2as` (see README) |
-            | Debian/Ubuntu (manual) | `v2as_*_amd64.deb` | `sudo apt install ./v2as_*_amd64.deb` |
-            | Linux (portable) | `v2as-*-linux-*.run` | `chmod +x *.run && ./v2as-*-linux-*.run` |
-            | Windows | `Video2ArabicSubs-Setup-*.exe` | run the installer |
+            | 🐧 Debian / Ubuntu | المستودع الرسمي | `sudo apt install v2as` (أدناه) |
+            | 🐧 Debian / Ubuntu | `v2as_0.4_amd64.deb` | `sudo apt install ./v2as_0.4_amd64.deb` |
+            | 🐧 لينكس محمول | `v2as-0.4-linux-x86_64.run` | `chmod +x *.run && ./v2as-0.4-linux-x86_64.run` |
+            | 🪟 ويندوز | `Video2ArabicSubs-Setup-0.4.exe` | شغّل المُثبِّت |
 
-            Arabic subtitles (SRT / VTT) from any video — offline local
-            translation by default, bilingual desktop + web UI.
+            ```bash
+            echo "deb [trusted=yes] https://ragaeidos.website/video2arabicsubs/ stable main" \
+              | sudo tee /etc/apt/sources.list.d/v2as.list
+            sudo apt update
+            sudo apt install v2as
+            ```
+
+            > بعد التثبيت: `v2as` (واجهة سطح المكتب) · `v2as --web` (تطبيق ويب على `127.0.0.1:7676`) · `v2as --lang en`.
+            > الحزمة خفيفة (~1.1MB) — المكتبات تُثبَّت تلقائياً عند أول تشغيل في `~/.cache/v2as/venv`.
+
+            ### 🧪 الجودة
+
+            اختبارات المزايا **42/42** + اختبار شامل E2E (خط الإنتاج + الويب + سطح المكتب) — كلها تعمل بدون إنترنت وبدون نماذج ML.
