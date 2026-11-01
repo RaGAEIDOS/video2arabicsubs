@@ -179,12 +179,34 @@ def test_run_batch() -> None:
         batch_mod.run_pipeline = real
 
 
+def test_reshape() -> None:
+    print("\n[M16] Arabic display shaping (app/reshape.py)")
+    from app import i18n, reshape
+
+    # Latin / digits pass through untouched — safe to wrap every label
+    check("Latin passthrough", reshape.shaped("Hello 123 SRT+VTT") == "Hello 123 SRT+VTT")
+    check("empty passthrough", reshape.shaped("") == "")
+
+    # Arabic is converted to contextual presentation forms (U+FE70–FEFC)
+    out = reshape.shaped("مرحبا")
+    check("Arabic rewritten to presentation forms",
+          out != "مرحبا" and any("\ufe70" <= ch <= "\ufefc" for ch in out), repr(out))
+    check("shaping enabled on this platform", reshape.ENABLED is True)
+
+    # i18n stays LOGICAL (tests and on-disk text rely on it) — only the
+    # display boundary shapes
+    tagline = i18n.tr("ar", "app.tagline")
+    check("i18n.tr stays logical (no presentation forms)",
+          not any("\ufe70" <= ch <= "\ufefc" for ch in tagline), repr(tagline))
+
+
 def main() -> int:
     test_options_defaults()
     test_credit()
     test_natural_order()
     test_scan()
     test_run_batch()
+    test_reshape()
     print(f"\n{'=' * 50}\n{PASS} passed, {FAIL} failed")
     return 1 if FAIL else 0
 

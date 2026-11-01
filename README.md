@@ -51,7 +51,8 @@ pinned: false
   مع مفتاح تشغيل/إيقاف في الواجهتين.
 - 📦 **حزم تثبيت جاهزة**: `.deb` خفيفة (~1.1MB) بإعداد تلقائي عند أول تشغيل، مُثبِّت `.run` مستقل ذاتي التفكيك، مُثبِّت `.exe` لويندوز، و**مستودع apt رسمي**:
   `sudo apt install v2as`
-- ✅ اختبارات جديدة: `tests/features_test.py` (37 فحصاً للمزايا الجديدة) + تحديث الاختبار الشامل.
+- 🔤 **حروف عربية متصلة في الواجهة (لينكس)** — Tcl/Tk 8.6 على لينكس بلا محرّك تشكيل نصوص، فتُعرض الحروف منفصلة. تُشكَّل النصوص **مسبقاً عند حدّ العرض** عبر `arabic-reshaper` + `python-bidi` (`app/reshape.py`) — تلقائي على لينكس، وبدون تأثير على ويندوز/ماك (تشكيلها الأصلي سليم) وعلى ملفات الترجمة ذاتها (تبقى بترتيب منطقي).
+- ✅ اختبارات جديدة: `tests/features_test.py` (42 فحصاً للمزايا الجديدة) + تحديث الاختبار الشامل.
 
 ---
 
@@ -219,7 +220,7 @@ docker run -p 8000:76 -v v2a-data:/data video2arabicsubs
 ## 🧪 الاختبار
 
 ```bash
-python tests/features_test.py   # مزايا v0.4 (الائتمان، الترتيب الطبيعي، الدفعات…) — 37 فحصاً
+python tests/features_test.py   # مزايا v0.4 (الائتمان، الترتيب الطبيعي، الدفعات…) — 42 فحصاً
 python tests/smoke_test.py      # اختبار شامل E2E (محاكاة كامل لخط الإنتاج + الويب + سطح المكتب)
 python tests/demo_server.py     # خادم تجريبي بنتائج وهمية → http://127.0.0.1:8477
 python tests/screenshot.py      # توليد لقطات الواجهة للتوثيق (يحتاج DISPLAY)
@@ -258,6 +259,7 @@ makensis installer.nsi                        # → dist/Video2ArabicSubs-Setup-
 | [deep-translator](https://github.com/nidhaloff/deep-translator) | ترجمة جوجل (خيار صريح + احتياطي تلقائي) |
 | [moviepy](https://github.com/Zulko/moviepy) | استخراج الصوت من الفيديو |
 | [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) | تضمين FFmpeg تلقائياً |
+| [arabic-reshaper](https://github.com/mpcabat/python-arabic-reshaper) + [python-bidi](https://github.com/python-bidi/python-bidi) | تشكيل الحروف العربية وترتيبها البصري في واجهة لينكس (Tk 8.6 بلا HarfBuzz) |
 | [FastAPI](https://fastapi.tiangolo.com/) + [uvicorn](https://www.uvicorn.org/) | خادم الويب + SSE |
 | [Tailwind CSS](https://tailwindcss.com/) | تنسيق الويب (CDN، بدون خطوة بناء) |
 | Tkinter (`app/widgets.py`, `app/theme.py`) | واجهة سطح مكتب عصرية بأنيميشن خاص |
