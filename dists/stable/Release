@@ -1,0 +1,17 @@
+Origin: Video2ArabicSubs
+Label: Video2ArabicSubs
+Suite: stable
+Codename: stable
+Date: Mon, 02 Nov 2026 13:28:31 UTC
+Architectures: amd64
+Components: main
+Description: Video2ArabicSubs official apt repository
+MD5Sum:
+ 6b4c55b6aa798f21033fe3e3bcf202d7 1290 main/binary-amd64/Packages
+ bb80a5f50257ac2f9245f51016a79c70 832 main/binary-amd64/Packages.gz
+SHA1:
+ 1723b6c7eee633e03c91903e07954fe3ed2ef8a7 1290 main/binary-amd64/Packages
+ 45d72a9a1fd4c447484fdf181dbb914de5b4b52d 832 main/binary-amd64/Packages.gz
+SHA256:
+ c0a86a4f110d7ff03fd05592f36d15c668c45f790176285fdad4dd2107ea15f0 1290 main/binary-amd64/Packages
+ 2acb336b6e6e6c2fa8e44ddd6a57a592885dabd5aa84b3214546dc1391729326 832 main/binary-amd64/Packages.gz
