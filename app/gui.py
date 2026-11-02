@@ -191,15 +191,103 @@ class App:
         self.body = tk.Frame(self.root, bg=theme.BG)
         self.body.pack(fill="both", expand=True, padx=18, pady=14)
 
-        # two columns; order flipped for RTL
+        # two columns; order flipped for RTL.
+        # col_left (source + options) scrolls vertically: on short windows
+        # the options card used to be clipped right below "extras", leaving
+        # the toggles unreachable. When everything fits the column still
+        # stretches exactly like before (the source card absorbs the slack).
         self.col_left = tk.Frame(self.body, bg=theme.BG)
         self.col_right = tk.Frame(self.body, bg=theme.BG)
 
-        self._build_source_card(self.col_left)
-        self._build_options_card(self.col_left)
+        self.col_canvas = tk.Canvas(self.col_left, bg=theme.BG,
+                                    highlightthickness=0, bd=0)
+        self.col_scroll = tk.Scrollbar(self.col_left, orient="vertical",
+                                       command=self.col_canvas.yview)
+        self.col_inner = tk.Frame(self.col_canvas, bg=theme.BG)
+        self._col_win = self.col_canvas.create_window((0, 0), window=self.col_inner,
+                                                      anchor="nw")
+        self.col_scroll.pack(side="right", fill="y")
+        self.col_canvas.pack(side="left", fill="both", expand=True)
+        self.col_canvas.configure(yscrollcommand=self.col_scroll.set)
+
+        self._build_source_card(self.col_inner)
+        self._build_options_card(self.col_inner)
         self._build_job_card(self.col_right)
 
+        self.col_canvas.bind("<Configure>", self._sync_left_scroll)
+        # add="+" is essential: Card binds its own <Configure> handler on
+        # body to keep the card height in sync — replacing it would freeze
+        # the cards at their default canvas height.
+        self.card_source.body.bind("<Configure>", self._sync_left_scroll, add="+")
+        self.card_options.body.bind("<Configure>", self._sync_left_scroll, add="+")
+        # Settling can also happen WITHOUT any Configure event (e.g. text
+        # re-wrapping after the first width pass shrinks a card's request
+        # silently) — a light periodic sync guarantees the scroll region
+        # always converges to the real content height.
+        self._left_sync_tick()
+        self._bind_wheel()
+
         self._pack_columns()
+
+    def _left_sync_tick(self):
+        if self._closing:
+            return
+        self._sync_left_scroll()
+        try:
+            self.root.after(300, self._left_sync_tick)
+        except tk.TclError:
+            pass
+
+    # ── left column scrolling ──────────────────────────────
+    def _sync_left_scroll(self, _event=None):
+        # Stretch the inner frame to the column height when the content
+        # fits (no scrollbar, source card expands — the classic layout);
+        # grow it past the column when the content is taller, so the area
+        # below "extras" becomes reachable by scrolling. The scrollbar is
+        # only packed while scrolling is actually possible, so nothing
+        # changes visually on roomy windows.
+        try:
+            cw = self.col_canvas.winfo_width()
+            if cw <= 1:
+                return
+            ch = self.col_canvas.winfo_height()
+            req = self.col_inner.winfo_reqheight()
+            h = max(ch, req)
+            self.col_canvas.itemconfigure(self._col_win, width=cw, height=h)
+            self.col_canvas.configure(scrollregion=(0, 0, cw, h))
+            if req > ch + 1:
+                if not self.col_scroll.winfo_ismapped():
+                    self.col_scroll.pack(side="right", fill="y")
+            elif self.col_scroll.winfo_ismapped():
+                self.col_scroll.pack_forget()
+        except tk.TclError:
+            pass
+
+    def _bind_wheel(self):
+        # Wheel events are delivered to the widget under the cursor —
+        # usually a child of the column — so listen application-wide and
+        # walk up the parent chain to decide whether to scroll.
+        self.root.bind_all("<MouseWheel>", self._on_wheel_left, add="+")
+        self.root.bind_all("<Button-4>", self._on_wheel_left, add="+")
+        self.root.bind_all("<Button-5>", self._on_wheel_left, add="+")
+
+    def _on_wheel_left(self, event):
+        w = event.widget
+        while w is not None and w is not self.col_left:
+            w = getattr(w, "master", None)
+        if w is None:
+            return None                     # pointer outside the column
+        num = getattr(event, "num", None)
+        if num in (4, 5):                   # X11 wheel
+            step = -1 if num == 4 else 1
+        else:                               # Windows / macOS wheel
+            delta = getattr(event, "delta", 0)
+            if not delta:
+                return None
+            step = (-int(round(delta / 120)) if abs(delta) >= 60
+                    else (-1 if delta > 0 else 1))
+        self.col_canvas.yview_scroll(step, "units")
+        return "break"
 
     def _pack_columns(self):
         for col in (self.col_left, self.col_right):
