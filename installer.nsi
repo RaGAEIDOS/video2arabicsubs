@@ -4,7 +4,7 @@
 ; Output: dist\Video2ArabicSubs-Setup-<version>.exe
 
 !define APP_NAME "Video2ArabicSubs"
-!define APP_VERSION "0.4"
+!define APP_VERSION "0.4.1"
 !define APP_PUBLISHER "Ragaei Muhammed"
 !define APP_EXE "Video2ArabicSubs.exe"
 !define APP_URL "https://github.com/RaGAEIDOS/video2arabicsubs"

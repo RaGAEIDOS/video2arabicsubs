@@ -8,7 +8,7 @@ app_port: 76
 pinned: false
 ---
 
-# 🎬 Video2ArabicSubs v0.4
+# 🎬 Video2ArabicSubs v0.4.1
 
 <p align="center">
   <img src="img/first-logo-design.png" width="520" alt="Video2ArabicSubs logo"/>
@@ -38,6 +38,10 @@ pinned: false
 
 ---
 
+## ✅ ما الجديد في 0.4.1
+
+- 🧭 **كارت الخيارات بقى قابلاً للتمرير** — عمود البطاقات يتمدّد ملي شاشتك أو يتحرّك بالعجلة/الشريط لما المحتوى يكبر، ف**كل المفاتيح تحت «إضافات»** (سطر الرؤية · حرق الترجمة · BOM) صارت ظاهرة في أي حجم نافذة — مع تمرير بالعجلة فوق أي عنصر.
+
 ## 🆕 ما الجديد في الإصدار 0.4
 
 - 🎨 **واجهة سطح مكتب عصرية بالكامل** — بطاقات دائرية الحواف، شريط تقدّم متدرّج متحرّك، شريط مراحل (stepper)، أزرار/مفاتيح بحركة ناعمة، **ثنائية اللغة عربي / English** بتبديل فوري مع انعكاس الاتجاه (RTL/LTR)، **ولا تعلّق أبداً**: كل معالجة تعمل في خيط خلفي وتتواصل عبر طابور أحداث منظّم.
@@ -61,9 +65,9 @@ pinned: false
 | المنصة | الحزمة | الأمر |
 |--------|--------|-------|
 | 🐧 Debian / Ubuntu (**apt**) | المستودع الرسمي | `sudo apt install v2as` ← التفاصيل أدناه |
-| 🐧 Debian / Ubuntu (يدوي) | `v2as_0.4_amd64.deb` | `sudo apt install ./v2as_0.4_amd64.deb` |
-| 🐧 لينكس (محمول، بدون صلاحيات) | `v2as-0.4-linux-x86_64.run` | `chmod +x *.run && ./v2as-0.4-linux-x86_64.run` |
-| 🪟 ويندوز | `Video2ArabicSubs-Setup-0.4.exe` | شغّل المُثبِّت |
+| 🐧 Debian / Ubuntu (يدوي) | `v2as_0.4.1_amd64.deb` | `sudo apt install ./v2as_0.4.1_amd64.deb` |
+| 🐧 لينكس (محمول، بدون صلاحيات) | `v2as-0.4.1-linux-x86_64.run` | `chmod +x *.run && ./v2as-0.4.1-linux-x86_64.run` |
+| 🪟 ويندوز | `Video2ArabicSubs-Setup-0.4.1.exe` | شغّل المُثبِّت |
 
 > كل الحزم متاحة في [**GitHub Releases**](https://github.com/RaGAEIDOS/video2arabicsubs/releases) — تُبنى تلقائياً عند كل وسم إصدار عبر GitHub Actions.
 
@@ -233,14 +237,14 @@ python tests/screenshot.py      # توليد لقطات الواجهة للتو�
 ## 🛠️ بناء الحزم
 
 ```bash
-./scripts/build-deb.sh          # → dist/v2as_0.4_amd64.deb         (خفيفة ~1.1MB)
-./scripts/build-run.sh          # → dist/v2as-0.4-linux-x86_64.run   (محمول، بدون صلاحيات)
+./scripts/build-deb.sh          # → dist/v2as_0.4.1_amd64.deb         (خفيفة ~1.1MB)
+./scripts/build-run.sh          # → dist/v2as-0.4.1-linux-x86_64.run   (محمول، بدون صلاحيات)
 ./scripts/build-apt-repo.sh     # → build/apt-repo/   (pool + dists جاهزة لنشر gh-pages)
 
 # ويندوز:
 pip install -r requirements-build.txt
 pyinstaller --clean video2arabicsubs.spec     # → dist/Video2ArabicSubs/
-makensis installer.nsi                        # → dist/Video2ArabicSubs-Setup-0.4.exe
+makensis installer.nsi                        # → dist/Video2ArabicSubs-Setup-0.4.1.exe
 # أو build.bat الذي يفعل الثلاثة معاً
 ```
 

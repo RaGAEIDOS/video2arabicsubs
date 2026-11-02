@@ -209,7 +209,7 @@ jobs:
           files: release-assets/*
           generate_release_notes: true
           body: |
-            ## 🎬 Video2ArabicSubs v0.4
+            ## 🎬 Video2ArabicSubs v0.4.1
 
             تحويل أي فيديو إلى **ترجمة عربية (SRT/VTT)** — محلياً وبدون إنترنت افتراضياً، بواجهة عصرية ثنائية اللغة (عربي / English) **لا تعلّق أبداً**.
 
@@ -233,9 +233,9 @@ jobs:
             | المنصة | الحزمة | الأمر |
             |---|---|---|
             | 🐧 Debian / Ubuntu | المستودع الرسمي | `sudo apt install v2as` (أدناه) |
-            | 🐧 Debian / Ubuntu | `v2as_0.4_amd64.deb` | `sudo apt install ./v2as_0.4_amd64.deb` |
-            | 🐧 لينكس محمول | `v2as-0.4-linux-x86_64.run` | `chmod +x *.run && ./v2as-0.4-linux-x86_64.run` |
-            | 🪟 ويندوز | `Video2ArabicSubs-Setup-0.4.exe` | شغّل المُثبِّت |
+            | 🐧 Debian / Ubuntu | `v2as_0.4.1_amd64.deb` | `sudo apt install ./v2as_0.4.1_amd64.deb` |
+            | 🐧 لينكس محمول | `v2as-0.4.1-linux-x86_64.run` | `chmod +x *.run && ./v2as-0.4.1-linux-x86_64.run` |
+            | 🪟 ويندوز | `Video2ArabicSubs-Setup-0.4.1.exe` | شغّل المُثبِّت |
 
             ```bash
             echo "deb [trusted=yes] https://ragaeidos.website/video2arabicsubs/ stable main" \
