@@ -2,17 +2,17 @@ Package: v2as
 Version: 0.4.1
 Architecture: amd64
 Maintainer: RaGAEIDOS <RaGAEIDOS@users.noreply.github.com>
-Installed-Size: 1416
+Installed-Size: 1436
 Depends: python3 (>= 3.9), python3-venv, python3-pip, python3-tk, ffmpeg
 Recommends: python3-gi | gir1.2-appindicator3-0.1
 Section: video
 Priority: optional
 Homepage: https://github.com/RaGAEIDOS/video2arabicsubs
 Filename: pool/main/v/v2as/v2as_0.4.1_amd64.deb
-Size: 1102546
-MD5sum: d0bbd28c3410cd884b24183765c8e7a5
-SHA1: a464b867c07dd6a72612ff0ad1db1bdf05bfb9ef
-SHA256: 603a8f285c76af1b4dfd58391d1e63c2bd87db5e3a42bb47254bd6fc664245eb
+Size: 1146512
+MD5sum: 0a4ba0002a3ee99197d774acc17f2a2f
+SHA1: dc5584229164d3016c7ab053601fb618bdf64a05
+SHA256: fab32cee4e83d83ca8b58b8ebd3ab8d63dbc46a226dd9413b13a3d378e5b7f49
 Description: Video2ArabicSubs — videos to Arabic subtitles (SRT/VTT)
  Speech-to-text with OpenAI Whisper and translation to Arabic using an
  offline local model (Argos Translate) by default, with Google Translate
